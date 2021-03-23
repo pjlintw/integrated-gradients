@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 class TransformerDecLayer(nn.Module):
-	def __init__(self, d_model, num_head, intermediate_dim, rate=0.1):
+    def __init__(self, d_model, num_head, intermediate_dim, rate=0.1):
 		super(TransformerDecLayer, self).__init__()
 
 		self.mha1 = MultiHeadAttention(d_model, d_model, num_head)
