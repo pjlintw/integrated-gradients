@@ -7,6 +7,36 @@ import torch
 import torch.nn as nn 
 import torch.nn.functional as F
 
+
+
+class WarmupScheduler:
+    """warm-up scheduler."""
+    def __init__(self, model_size, factor, warmup, optimizer):
+        self.optimizer = optimizer
+        self._step = 0
+        self.warmup = warmup
+        self.factor = factor
+        self.model_size = model_size
+        self._rate = 0
+        
+    def step(self):
+        "Update parameters and rate"
+        self._step += 1
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
+        
+    def rate(self, step = None):
+        "Implement `lrate` above"
+        if step is None:
+            step = self._step
+        return self.factor * \
+            (self.model_size ** (-0.5) *
+            min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+
 def get_angles(pos, i, dim):
     # angle_rates = 1 / np.power(10000, (2 * (i//2)) / np.float32(dim))
     angle_rates = 1 / torch.pow(10000, ((2 * (i//2)) / dim) )
@@ -167,11 +197,19 @@ class FeedForwardBlock(nn.Module):
 
 
 
-
 if __name__ == "__main__":
-
-
     sample_ffn = FeedForwardBlock(512, 2048)
     x = torch.rand((64,50,512))
     y = sample_ffn(x)   
     print(y.shape)
+
+    opts = [WarmupScheduler(512, 1, 4000, None), 
+            WarmupScheduler(512, 1, 8000, None),
+            WarmupScheduler(256, 1, 4000, None)]
+
+    plt.plot(np.arange(1, 20000), [[opt.rate(i) for opt in opts] for i in range(1, 20000)])
+    plt.legend(["512:4000", "512:8000", "256:4000"])
+    plt.show()
+
+
+

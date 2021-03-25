@@ -1,4 +1,7 @@
 
+def new():
+    return None
+
 def f():
     for i in range(5):
         print(i)
