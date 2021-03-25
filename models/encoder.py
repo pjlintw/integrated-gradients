@@ -1,4 +1,4 @@
-
+     
 from transformer_blocks import positional_encoding, MultiHeadAttention, FeedForwardBlock
 
 import torch
@@ -17,7 +17,7 @@ class TransformerEncLayer(nn.Module):
         
         self.dropout1 = nn.Dropout(p=rate)
         self.dropout2 = nn.Dropout(p=rate)
-
+        
     def forward(self, x, training, mask):
         
         # (batch_size, src_seq_len, d_model)
