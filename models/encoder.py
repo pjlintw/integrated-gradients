@@ -1,5 +1,5 @@
      
-from transformer_blocks import positional_encoding, MultiHeadAttention, FeedForwardBlock
+from .transformer_blocks import positional_encoding, MultiHeadAttention, FeedForwardBlock
 
 import torch
 import torch.nn as nn
@@ -61,11 +61,11 @@ class TransformerEncoder(nn.Module):
           scr: input with shape (batch_size, seq_len, d_model)
         """ 
         x = src
-        print("shape", x.shape)
+        #print("shape", x.shape)
         seq_len = x.shape[1]    
-        print("source length", seq_len)
+        #print("source length", seq_len)
         x = torch.mul(x, (self.d_model**(1/2)))
-        print(x.shape)
+        #print(x.shape)
         x += self.pos_encoding[:, :seq_len, :]
 
         if training is True:

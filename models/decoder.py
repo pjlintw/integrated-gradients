@@ -1,5 +1,5 @@
 
-from transformer_blocks import positional_encoding, MultiHeadAttention, FeedForwardBlock
+from .transformer_blocks import positional_encoding, MultiHeadAttention, FeedForwardBlock
 
 
 import torch
