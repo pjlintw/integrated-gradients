@@ -76,7 +76,7 @@ def create_transformer_masks(src, tgt, pad_idx):
     # the decoder.
     look_ahead_mask = create_look_ahead_mask(tgt.shape[1])
     dec_target_padding_mask = create_padding_mask(tgt, pad_idx)
-    combined_mask = torch.maximum(dec_target_padding_mask, look_ahead_mask)
+    combined_mask = torch.maximum(dec_target_padding_mask.cuda(), look_ahead_mask.cuda())
 
     return enc_pad_mask, combined_mask, dec_pad_mask
 

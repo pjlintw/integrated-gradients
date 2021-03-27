@@ -50,7 +50,7 @@ class TransformerEncoder(nn.Module):
                                                num_head, 
                                                intermediate_dim,
                                                rate) for _ in range(num_layers)]
-
+        self.enc_layers = torch.nn.ModuleList(self.enc_layers)
         self.dropout = nn.Dropout(p=rate)
 
 
@@ -59,14 +59,14 @@ class TransformerEncoder(nn.Module):
 
         Args:
           scr: input with shape (batch_size, seq_len, d_model)
-        """ 
-        x = src
+        """
+        x = src.cuda()
         #print("shape", x.shape)
         seq_len = x.shape[1]    
         #print("source length", seq_len)
         x = torch.mul(x, (self.d_model**(1/2)))
         #print(x.shape)
-        x += self.pos_encoding[:, :seq_len, :]
+        x += self.pos_encoding[:, :seq_len, :].cuda()
 
         if training is True:
             x = self.dropout(x)

@@ -1,5 +1,6 @@
 """Train conditional text GANs with trainer."""
 import os
+
 import argparse
 import logging
 import json
@@ -21,7 +22,6 @@ import torchtext.legacy.data
 from torchtext import vocab
 from torchtext.vocab import Vocab
 
-
 from captum.attr import LayerIntegratedGradients, TokenReferenceBase, visualization
 
 from datasets import ClassLabel, load_dataset, load_metric
@@ -31,6 +31,7 @@ from models.transformer import Transformer
 from models.utils import create_transformer_masks, init_weights
 from models.transformer_blocks import WarmupScheduler
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 class LangugageGAN:
     def __init__(self, generator, discriminator):
         self.generator = generator
@@ -82,7 +83,8 @@ def get_args():
     parser.add_argument('--batch_size', type=int, default=64)
     # parser.add_argument('--per_device_train_batch_size', type=int, default=64)
     # parser.add_argument('--per_device_eval_batch_size', type=int, default=64)
-    
+
+    parser.add_argument('--mle_epochs', type=int, default=3)
     parser.add_argument('--max_steps', type=int, default=10000)
     parser.add_argument('--max_train_samples', type=int)
     parser.add_argument('--max_val_samples', type=int)
@@ -183,21 +185,21 @@ def train_generator_MLE(generator, dataset,
             batch_lengths = features_dict["batch_lengths"]
     
             # To tensor
-            batch_labels = torch.tensor(batch_labels).unsqueeze(1) 
+            batch_labels = torch.tensor(batch_labels).unsqueeze(1).cuda()
             #print("shape of encoder's input", batch_labels.shape)
             #print(batch_labels)
-            batch_token_ids = torch.tensor(batch_token_ids) 
+            batch_token_ids = torch.tensor(batch_token_ids).cuda()
             # Sample a batch of sequences from generator 
-            gen_inp = batch_token_ids[:, :-1]
-            gen_target = batch_token_ids[:, 1:]
+            gen_inp = batch_token_ids[:, :-1].cuda()
+            gen_target = batch_token_ids[:, 1:].cuda()
 
-            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels, gen_inp, pad_idx)
-            output, attn = generator(batch_labels,
-                                     gen_inp,
+            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels.cuda(), gen_inp.cuda(), pad_idx)
+            output, attn = generator(batch_labels.cuda(),
+                                     gen_inp.cuda(),
                                      training=False,
-                                     enc_padding_mask=enc_padding_mask,
-                                     look_ahead_mask=combined_mask,
-                                     dec_padding_mask=dec_padding_mask)
+                                     enc_padding_mask=enc_padding_mask.cuda(),
+                                     look_ahead_mask=combined_mask.cuda(),
+                                     dec_padding_mask=dec_padding_mask.cuda())
             
             # (batch_size*(seq_len-1), vocab_size)
             viewed_output = output.view(-1, vocab_size)
@@ -225,7 +227,9 @@ def train_generator_MLE(generator, dataset,
             # print("tgt shape", gen_target.shape)
             # print("token1", decode_batch(gen_inp, id2tok, unk_idx)[0])
             # print("token1", decode_batch(gen_target, id2tok, unk_idx)[0])
-            
+        pred_sentences = decode_batch(gen_inp, id2tok, unk_idx)
+        print("Done", "", pred_sentences[0])
+        print(pred_sentences[1])
     return None
 
 def train_discriminator(generator, discriminator, dataset,
@@ -397,11 +401,6 @@ def main():
     with open(write_path, 'w') as f:
         json.dump(args.__dict__, f, indent=2)
         logger.info(f"Saving hyperparameters to: {write_path}")
-    
-    # Set GPU
-    os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
-
     ########## Load dataset from script. ##########
     # 'wiki-table-questions.py'
     datasets = load_dataset(args.dataset_script)
@@ -597,6 +596,7 @@ def main():
                             padding_idx=PAD_IDX,
                             shared_emb_layer=args.tf_shared_emb_layer, # Whether use embeeding layer from encoder
                             rate=args.tf_dropout_rate)
+    generator.cuda()
     #generator.apply(init_weights)
     logging.info(generator.encoder)
 
@@ -618,6 +618,7 @@ def main():
                                 dropout=args.rnn_dropout_rate,
                                 padding_idx=PAD_IDX,
                                 bidirectional=args.rnn_bidirectional)
+    discriminator.cuda()
     logging.info(discriminator)
     
     
@@ -643,7 +644,7 @@ def main():
                         dataset=train_iter,
                         opt=gen_optimizer,
                         logging_steps=50, 
-                        epochs=1,
+                        epochs=args.mle_epochs,
                         tokenizer_dict=tokenizer_collector)
     
     ### Pre-train generator ###

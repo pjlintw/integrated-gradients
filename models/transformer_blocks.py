@@ -148,9 +148,9 @@ class MultiHeadAttention(nn.Module):
         batch_size = q.shape[0]
 
         # map embeding dim to dim
-        q = self.w_q(q)
-        k = self.w_k(k)
-        v = self.w_v(v)
+        q = self.w_q(q.cuda()).cuda()
+        k = self.w_k(k).cuda()
+        v = self.w_v(v).cuda()
 
         # shape (batch_size, num_head, seq_len, head_dim)
         q = self.split_head(q, batch_size)
@@ -170,6 +170,8 @@ class MultiHeadAttention(nn.Module):
         if self.use_output_layer:
             out = self.output_layer(out)
 
+        out.cuda()
+        attn_w.cuda()
         return out, attn_w
 
 

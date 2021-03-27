@@ -57,7 +57,7 @@ class Transformer(nn.Module):
         src = self.embedding_layer(src)
 
         # (batch_size, inp_seq_len, d_model)
-        enc_out = self.encoder(src, training, enc_padding_mask)
+        enc_out = self.encoder(src, training, enc_padding_mask).cuda()
 
         # print("type of decoder input", type(tgt))
         # print("decoder input", tgt)

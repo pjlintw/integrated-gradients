@@ -70,6 +70,7 @@ class TransformerDecoder(nn.Module):
                                     num_head,
                                     intermediate_dim,
                                     rate) for _ in range(num_layers)]
+        self.dec_layers = torch.nn.ModuleList(self.dec_layers)
         self.dropout = nn.Dropout(p=rate)
 
 
@@ -79,7 +80,7 @@ class TransformerDecoder(nn.Module):
 
         x = self.embedding(x)
         x = torch.mul(x, (self.d_model**(1/2)))
-        x += self.pos_encoding[:, :seq_len, :]
+        x += self.pos_encoding[:, :seq_len, :].cuda()
     
         if training is True:
             x = self.dropout(x)
