@@ -58,12 +58,12 @@ class TransformerDecoder(nn.Module):
         self.d_model = d_model
         self.num_layers = num_layers
 
-        if shared_emb_layer is not None:
-            self.embedding = shared_emb_layer
-        else:
+        if shared_emb_layer is None or shared_emb_layer is False:
             self.embedding = nn.Embedding(target_vocab_size, d_model)
-
-
+            
+        else:
+            self.embedding = shared_emb_layer
+          
         self.pos_encoding = positional_encoding(max_tgt_len, d_model)
 
         self.dec_layers = [TransformerDecLayer(d_model,

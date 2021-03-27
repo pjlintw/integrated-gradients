@@ -23,8 +23,7 @@ class Transformer(nn.Module):
         self.pad_idx = padding_idx
 
         # (vocab_size, emb_dim)
-        self.embedding_layer = nn.Embedding(input_vocab_size, d_model,
-                                            padding_idx)
+        self.embedding_layer = nn.Embedding(input_vocab_size, d_model)
     
         self.encoder = TransformerEncoder(num_layers, d_model, num_head,
                                           intermediate_dim,
@@ -60,9 +59,14 @@ class Transformer(nn.Module):
         # (batch_size, inp_seq_len, d_model)
         enc_out = self.encoder(src, training, enc_padding_mask)
 
+        # print("type of decoder input", type(tgt))
+        # print("decoder input", tgt)
         # (batch_size, tgt_seq_len, d_model)
-        dec_output, dec_attn = self.decoder(tgt, enc_out, training, look_ahead_mask,
-                                   dec_padding_mask)
+        dec_output, dec_attn = self.decoder(x=tgt, 
+                                            enc_output=enc_out, 
+                                            training=training, 
+                                            look_ahead_mask=look_ahead_mask,
+                                            padding_mask=dec_padding_mask)
 
         # (batch_size, tgt_seq_len, target_vcoab_size)
         final_output = self.final_layer(dec_output)
@@ -98,8 +102,7 @@ class Transformer(nn.Module):
 
         for i in range(max_len):
             # enc_pad_mask, combined_mask, dec_pad_mask
-            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx )
-
+            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx)
 
             # predictions.shape == (batch_size, seq_len, vocab_size)
             predictions, _ = self.forward(inp,    # (bathc_size, 1)
@@ -116,7 +119,7 @@ class Transformer(nn.Module):
 
             # (batch_size, 1)
             #assert inp.shape[-1] = 1
-            gumbel_distribution = gubel_softmax_sample(predictions, temperature)
+            gumbel_distribution = gumbel_softmax_sample(predictions, temperature)
             # (batch_size, vocab_size)
             # print("gumbel", gumbel_distribution.shape)
 
@@ -132,12 +135,14 @@ class Transformer(nn.Module):
         #print(sampled_ids==output[:,1:])
         return output
 
+
 def sample_gumbel(shape, eps=1e-20):
     """Sample from Gumbel(0, 1)"""
     noise = torch.rand(shape)
     return -torch.log(-torch.log(noise+eps)+eps)
 
-def gubel_softmax_sample(logits, temperature):
+
+def gumbel_softmax_sample(logits, temperature):
     """Sample from Gumbel softmax distribution.
     Reference:
         1. Gumbel distribution: https://en.wikipedia.org/wiki/Gumbel_distribution
@@ -145,6 +150,7 @@ def gubel_softmax_sample(logits, temperature):
     """
     y = logits + sample_gumbel(logits.shape)
     return nn.functional.softmax(y/temperature, dim=-1)
+
 
 if __name__ == "__main__":
     transf = Transformer(2,512,8,2048,8500, 8000,10000,6000, -100, None)

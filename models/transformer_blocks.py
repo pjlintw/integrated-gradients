@@ -20,7 +20,7 @@ class WarmupScheduler:
         self._rate = 0
         
     def step(self):
-        "Update parameters and rate"
+        """Update parameters and rate"""
         self._step += 1
         rate = self.rate()
         for p in self.optimizer.param_groups:
@@ -29,7 +29,7 @@ class WarmupScheduler:
         self.optimizer.step()
         
     def rate(self, step = None):
-        "Implement `lrate` above"
+        """Implement `lrate` above"""
         if step is None:
             step = self._step
         return self.factor * \

@@ -46,7 +46,8 @@ class LSTMEncoder(nn.Module):
         # Layers
         ############################################
         # Embedding layer
-        self.embedding_layer = nn.Embedding(vocab_size, embedding_dim, padding_idx=0)
+        self.embedding_layer = nn.Embedding(vocab_size, embedding_dim, padding_idx=padding_idx)
+        #print("vocab", vocab_size)
 
         # LSTM layer
         self.lstm = nn.LSTM(embedding_dim,
@@ -80,14 +81,16 @@ class LSTMEncoder(nn.Module):
             ###############################################
             # sorting
             ###############################################
-            print(x)
+            seq_len_arr = torch.tensor(lengths)
+
+            #print(x)
             lenghts_sorted, sorted_i = seq_len_arr.sort(descending=True)
             _, reverse_i = sorted_i.sort()
 
-            print(sorted_i)
+            #print(sorted_i)
             x = x[sorted_i]
 
-            print(x)
+            #print(x)
 
             # Map word id to embedding
             emb = self.embedding_layer(x)
@@ -101,7 +104,7 @@ class LSTMEncoder(nn.Module):
             # (non-padding-word-embeddings, )
             # reference: https://stackoverflow.com/questions/51030782/why-do-we-pack-the-sequences-in-pytorch
             packed_emb = pack_padded_sequence(input=emb, 
-                                              length=lenghts_sorted, 
+                                              lengths=lenghts_sorted, 
                                               batch_first=True, 
                                               enforce_sorted=True)
 
@@ -113,14 +116,18 @@ class LSTMEncoder(nn.Module):
             # Recover packed sequence to (batch, seq_len, lstm_dim*n_direction)
             out_padded, output_len = pad_packed_sequence(packed_output, batch_first=True)        
             
-            # dense layer
-            # (lstm_dim*n_direction, lstm_dim)
-            # dense_out1 = self.fc1(out_padded)
+            # 3D to 2D
+            # (batch_size, 1, lstm_dim*n_direction) -> (batch_size, lstm_dim*n_direction)
+            last_h = out_padded[:, -1:, :].squeeze()
+            #print("last_h", last_h.shape)
             
             # output layer
-            pred = self.output_layer(out_padded)
-
-        return pred
+            # out: shape (batch_size, 1)
+            logits = self.output_layer(last_h)
+            pred = torch.sigmoid(logits)
+            #print("out after dense layer", logits.shape)
+            #print("pred after squeeze", pred.shape)
+        return logits, pred
 
 
 if __name__ == '__main__':
