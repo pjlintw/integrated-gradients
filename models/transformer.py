@@ -135,6 +135,7 @@ class Transformer(nn.Module):
         #print(sampled_ids==output[:,1:])
         return output
 
+    
 
 def sample_gumbel(shape, eps=1e-20):
     """Sample from Gumbel(0, 1)"""

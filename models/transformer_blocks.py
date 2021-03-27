@@ -11,7 +11,7 @@ import torch.nn.functional as F
 
 class WarmupScheduler:
     """warm-up scheduler."""
-    def __init__(self, model_size, factor, warmup, optimizer):
+    def __init__(self, model_size, factor, optimizer, warmup=4000):
         self.optimizer = optimizer
         self._step = 0
         self.warmup = warmup
@@ -35,6 +35,9 @@ class WarmupScheduler:
         return self.factor * \
             (self.model_size ** (-0.5) *
             min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+    def zero_grad(self):
+        self.optimizer.zero_grad()
 
 
 def get_angles(pos, i, dim):

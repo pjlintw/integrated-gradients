@@ -1,4 +1,4 @@
-name: abc
+name: integrated-gradients
 
 dependencies:
   - python=3.8

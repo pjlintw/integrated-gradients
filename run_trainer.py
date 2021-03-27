@@ -28,7 +28,7 @@ from datasets import ClassLabel, load_dataset, load_metric
 
 from models.rnn import LSTMEncoder
 from models.transformer import Transformer
-from models.utils import create_transformer_masks
+from models.utils import create_transformer_masks, init_weights
 from models.transformer_blocks import WarmupScheduler
 
 class LangugageGAN:
@@ -159,7 +159,7 @@ def create_imdb_datasets():
 
 
 def train_generator_MLE(generator, dataset,
-                        opt, steps=1, epochs=1,
+                        opt, logging_steps=50, epochs=1,
                         tokenizer_dict=None):
     """Pre-train the generator with MLE."""
     # Prepare for `decode_batch`
@@ -211,7 +211,7 @@ def train_generator_MLE(generator, dataset,
             #torch.nn.utils.clip_grad_norm_(generator.parameters(), 0.5)
             opt.step()
 
-            if (step+1) % 5 == 0:
+            if (step+1) % 10 == 0:
                 msg = f"Step: {step+1}, Loss: {loss.item():.2f}"
                 logging.info(msg)
                 print(msg)
@@ -597,6 +597,7 @@ def main():
                             padding_idx=PAD_IDX,
                             shared_emb_layer=args.tf_shared_emb_layer, # Whether use embeeding layer from encoder
                             rate=args.tf_dropout_rate)
+    #generator.apply(init_weights)
     logging.info(generator.encoder)
 
 
@@ -633,19 +634,18 @@ def main():
     print("Pre-train the generator")
     gen_optimizer = optim.Adam(generator.parameters(), lr=0, betas=(0.9,0.98), eps=1e-9)
     gen_optimizer = WarmupScheduler(model_size=args.tf_dims,
-                                    factor=1,
-                                    warmup=1000,
+                                    factor=2,
+                                    warmup=4000,
                                     optimizer=gen_optimizer)
     #gen_optimizer =torch.optim.SGD(generator.parameters(), lr=5.0)
     #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
     train_generator_MLE(generator=generator,
                         dataset=train_iter,
                         opt=gen_optimizer,
-                        steps=1, 
+                        logging_steps=50, 
                         epochs=1,
                         tokenizer_dict=tokenizer_collector)
     
-
     ### Pre-train generator ###
     print("Pre-train discriminator")
     # dis_optimizer = optim.Adagrad(discriminator.parameters())

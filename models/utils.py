@@ -1,7 +1,31 @@
 
 import torch
+import torch.nn as nn
+from .encoder import TransformerEncoder
+from .decoder import TransformerDecoder
 
+def init_weights(m): 
+    if type(m) == nn.Dropout:   
+        return None
 
+    if type(m) == TransformerEncoder:
+        for layer in m.parameters():
+            nn.init.xavier_uniform(layer.weight)
+            layer.bias.data.fill_(0.01)
+        return None
+
+    if type(m) == TransformerDecoder:
+        for layer in m.parameters():
+            nn.init.xavier_uniform(layer.weight)
+            layer.bias.data.fill_(0.01)
+        return None
+
+    # if m.dim() > 1:        
+    nn.init.xavier_uniform(m.weight)
+    try:
+        m.bias.data.fill_(0.01)
+    except:
+        print(m, "no bias")
 
 def create_padding_mask(seq, pad_idx):
     """Creating tensor for masking pad tokens of scaled dot-product logits
