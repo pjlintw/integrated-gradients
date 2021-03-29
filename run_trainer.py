@@ -7,6 +7,7 @@ import json
 import pathlib
 import sys
 from functools import partial
+import numpy as np
 
 import captum
 import spacy
@@ -26,12 +27,16 @@ from captum.attr import LayerIntegratedGradients, TokenReferenceBase, visualizat
 
 from datasets import ClassLabel, load_dataset, load_metric
 
-from models.rnn import LSTMEncoder
+from models.rnn import LSTMEncoder,CustomLSTM
+
 from models.transformer import Transformer
-from models.utils import create_transformer_masks, init_weights
+from models.utils import create_transformer_masks, init_weights, prepare_discriminator_data,convert_tensor_to_tokens,save_k_exmaple_from_tensor,check_k_exmaple_from_tensor
 from models.transformer_blocks import WarmupScheduler
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+cuda_is_available = torch.cuda.is_available()
+device = torch.device("cuda:0" if cuda_is_available else "cpu")
+
+
 class LangugageGAN:
     def __init__(self, generator, discriminator):
         self.generator = generator
@@ -48,6 +53,8 @@ def str2bool(v):
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
+
+
 def get_args():
     """Parse arguments."""
     parser = argparse.ArgumentParser(description="")
@@ -60,7 +67,7 @@ def get_args():
     # Modeling discriminator
     parser.add_argument('--rnn_layers', type=int, default=1)
     parser.add_argument('--rnn_embedding_dims', type=int, default=256)
-    parser.add_argument('--rnn_dims', type=int, default=512)
+    parser.add_argument('--rnn_dims', type=int, default=256)
     parser.add_argument('--rnn_classes', type=int, default=1)
     parser.add_argument('--rnn_dropout_rate', type=float, default=0.1)
     parser.add_argument('--rnn_bidirectional', type=bool, default=False)
@@ -81,10 +88,8 @@ def get_args():
     parser.add_argument('--do_predict', type=bool, default=False)
 
     parser.add_argument('--batch_size', type=int, default=64)
-    # parser.add_argument('--per_device_train_batch_size', type=int, default=64)
-    # parser.add_argument('--per_device_eval_batch_size', type=int, default=64)
-
     parser.add_argument('--mle_epochs', type=int, default=3)
+    parser.add_argument('--train_discriminator_epochs', type=int, default=3)
     parser.add_argument('--max_steps', type=int, default=10000)
     parser.add_argument('--max_train_samples', type=int)
     parser.add_argument('--max_val_samples', type=int)
@@ -95,6 +100,7 @@ def get_args():
     parser.add_argument('--eval_steps', type=int, default=500)
     
     return parser.parse_args()
+
 
 def build_vocab(vocab_file, min_count=0):
     """Build vocabulary from file.
@@ -116,57 +122,17 @@ def build_vocab(vocab_file, min_count=0):
     return vocab
 
 
-
-
-def create_imdb_datasets():
-    """Create IMDb datasets."""
-    nlp = spacy.load('en_core_web_sm')
-
-
-    TEXT = torchtext.legacy.data.Field(lower=True, tokenize='spacy')
-    Label = torchtext.legacy.data.LabelField(dtype = torch.float)
-
-
-    train_it = torchtext.datasets.IMDB(root='.data/', split="train")
-    train_iter = DataLoader(train_it, batch_size=8, shuffle=False)
-
-
-
-    # List of two elements
-    for exm in train_iter:
-        label,texts = exm
-        print(len(texts))
-        pt(texts[0])
-        break
-
-
-    # train, test = torchtext.datasets.IMDB.splits(text_field=TEXT,
-    #                                              label_field=Label,
-    #                                              train='train',
-    #                                              test='test',
-    #                                              path='data/aclImdb')
-    #test, _ = test.split(split_ratio = 0.04)
-
-    #loaded_vectors = vocab.GloVe(name='6B', dim=100)
-
-    # If you prefer to use pre-downloaded glove vectors, you can load them with the following two command line
-    # loaded_vectors = torchtext.vocab.Vectors('data/glove.6B.100d.txt')
-    # TEXT.build_vocab(train, vectors=loaded_vectors, max_size=len(loaded_vectors.stoi))
-        
-    # TEXT.vocab.set_vectors(stoi=loaded_vectors.stoi, vectors=loaded_vectors.vectors, dim=loaded_vectors.dim)
-    # Label.build_vocab(train)
-
-    datasets = None
-    return datasets
-
-
-def train_generator_MLE(generator, dataset,
-                        opt, logging_steps=50, epochs=1,
+def train_generator_MLE(generator, 
+                        dataset,
+                        opt, 
+                        logging_steps=50, 
+                        epochs=1,
                         tokenizer_dict=None):
     """Pre-train the generator with MLE."""
     # Prepare for `decode_batch`
     vocab_size = tokenizer_dict["vocab_size"] 
     id2tok = tokenizer_dict["id2tok"] 
+    tok2id = tokenizer_dict["tok2id"] 
     unk_idx = tokenizer_dict["tok2id"]["[UNK]"]
     pad_idx = tokenizer_dict["tok2id"]["[PAD]"]
 
@@ -174,32 +140,32 @@ def train_generator_MLE(generator, dataset,
     # nn.CrossEntropyLoss: use logit as input
     loss_fn = nn.CrossEntropyLoss(ignore_index=pad_idx)
     for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
+        print('epoch %d : ' % (epoch + 1))
         total_loss = 0
         total_accuracy = 0
         for step, features_dict in enumerate(dataset):
-            opt.optimizer.zero_grad()
+            opt.zero_grad()
 
             batch_token_ids = features_dict["batch_token_ids"]
             batch_labels = features_dict["batch_labels"]
             batch_lengths = features_dict["batch_lengths"]
     
-            # To tensor
-            batch_labels = torch.tensor(batch_labels).unsqueeze(1).cuda()
+            # To 2D tensor
+            batch_labels = batch_labels.unsqueeze(1) #.cuda()
             #print("shape of encoder's input", batch_labels.shape)
             #print(batch_labels)
-            batch_token_ids = torch.tensor(batch_token_ids).cuda()
+            batch_token_ids = torch.tensor(batch_token_ids) #.cuda()
             # Sample a batch of sequences from generator 
-            gen_inp = batch_token_ids[:, :-1].cuda()
-            gen_target = batch_token_ids[:, 1:].cuda()
+            gen_inp = batch_token_ids[:, :-1] #.cuda()
+            gen_target = batch_token_ids[:, 1:] #.cuda()
 
-            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels.cuda(), gen_inp.cuda(), pad_idx)
-            output, attn = generator(batch_labels.cuda(),
-                                     gen_inp.cuda(),
+            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels, gen_inp, pad_idx)
+            output, attn = generator(batch_labels,
+                                     gen_inp,
                                      training=False,
-                                     enc_padding_mask=enc_padding_mask.cuda(),
-                                     look_ahead_mask=combined_mask.cuda(),
-                                     dec_padding_mask=dec_padding_mask.cuda())
+                                     enc_padding_mask=enc_padding_mask,
+                                     look_ahead_mask=combined_mask,
+                                     dec_padding_mask=dec_padding_mask)
             
             # (batch_size*(seq_len-1), vocab_size)
             viewed_output = output.view(-1, vocab_size)
@@ -213,7 +179,7 @@ def train_generator_MLE(generator, dataset,
             #torch.nn.utils.clip_grad_norm_(generator.parameters(), 0.5)
             opt.step()
 
-            if (step+1) % 10 == 0:
+            if (step+1) % logging_steps == 0:
                 msg = f"Step: {step+1}, Loss: {loss.item():.2f}"
                 logging.info(msg)
                 print(msg)
@@ -232,122 +198,173 @@ def train_generator_MLE(generator, dataset,
         print(pred_sentences[1])
     return None
 
-def train_discriminator(generator, discriminator, dataset,
-                        opt, steps=1, epochs=1,
-                        tokenizer_dict=None):
+def train_discriminator(generator, 
+                        discriminator, 
+                        match_network,
+                        dataset,
+                        opt_dis,
+                        opt_match, 
+                        logging_steps=50, 
+                        epochs=1,
+                        tokenizer_dict=None,
+                        args=None):
     """Pre-train the discriminator.
     
         (1) Distinguish true example from 
         (2) Measuring wetheater the sentence and condition are right paring.
     """
     # Prepare for `decode_batch`
+    vocab_size = tokenizer_dict["vocab_size"] 
     id2tok = tokenizer_dict["id2tok"] 
+    tok2id = tokenizer_dict["tok2id"] 
     unk_idx = tokenizer_dict["tok2id"]["[UNK]"]
+    pad_idx = tokenizer_dict["tok2id"]["[PAD]"]
+
+    loss_opt_fn = nn.BCELoss(size_average=False)
+    loss_match_fn = nn.BCELoss(size_average=False)
+    total_loss = list()
+    classification_loss = list()
+
+    matching_loss = list()
     for epoch in range(epochs):
-        print('epoch %d : ' % (epoch + 1), end='')
+        print('epoch %d : ' % (epoch + 1))
         sys.stdout.flush()
-        total_loss = 0
-        total_accuracy = 0
+        total_classification_loss = 0
+        total_matching_loss = 0
+
+        total_classification_acc = 0
+        total_matching_acc = 0
         for step, features_dict in enumerate(dataset):
-            #print("step", step)
-            batch_token_ids = features_dict["batch_token_ids"]
+            ###############
+            # Batch preparation
+            ###############
+            # G(c)
             batch_labels = features_dict["batch_labels"]
             batch_lengths = features_dict["batch_lengths"]
-    
-            batch_token_ids = torch.tensor(batch_token_ids)            
+            #print("type batch length", batch_lengths)
+            # D(x)
+            batch_token_ids = features_dict["batch_token_ids"]            
+            # D(c, x)
+            batch_pos_condition_ids = features_dict["batch_pos_condition_ids"]
+            batch_neg_condition_ids = features_dict["batch_neg_condition_ids"]
+
+            #dis_pair_tar = dis_pair_tar.unsqueeze(1)
             batch_size = batch_token_ids.shape[0]
-
+            # To 2D tensor
+            batch_labels = batch_labels.unsqueeze(1) #.cuda()    
             # Sample a batch of sequences from generator 
-            gen_inp = batch_token_ids[:, :-1]
-            gen_target = batch_token_ids[:, 1:]
-            print(gen_inp[0,:])
-            print(gen_target[0,:])
-            break
-            print("inp shape", gen_inp.shape)
-            print("tgt shape", gen_target.shape)
-            
-            #fake_out = generator(gen_inp, gen_tgt, training=False)
-            target = torch.ones(batch_size, 1)
-            #print(target)
-            #print(target.shape)
+            fake_seq_target = torch.zeros(batch_size, 1)
+        
+            ######################
+            # Generator 
+            ######################
+            # (batch_size, max_seq_len)
+            fake_seq = generator.sample(inp=batch_labels,
+                                        max_len=20,
+                                        temperature=0.3,
+                                        training=False,
+                                        sos_idx=tok2id["[CLS]"],
+                                        eos_idx=tok2id["[SEP]"])
 
+            dis_seq_inp, dis_seq_tar, seq_lengths = prepare_discriminator_data(pos_samples=batch_token_ids, 
+                                                                               neg_samples=fake_seq,
+                                                                               pos_lengths=batch_lengths,
+                                                                               neg_lengths=batch_lengths)
+
+            ##############################
+            # Discriminator: perform D(x)
+            ##############################
             # Set gradient zero
-            opt.zero_grad()
-            
+            opt_dis.zero_grad()
+
+            # `logit` is unnormalized 
             # `pred` is normalized by sigmoid
-            # both has shape (batch_size, 1)
-            logits, pred = discriminator(batch_token_ids, lengths=batch_lengths)
+            # (batch_size*2, 1)
+            #print("dis seq inp shape", dis_seq_inp.shape)
+            #seq_logits, seq_pred = discriminator(dis_seq_inp, lengths=seq_lengths, mode="classification")
+            seq_pred = discriminator(dis_seq_inp, seq_lengths)
+            seq_pred = seq_pred.squeeze() # To 1D-tensor
             
-            # Loss and update
-            loss_fn = nn.BCELoss()
-            loss = loss_fn(pred, target)
+            # Check
+            # k_example = 10
+            # seq_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
+            # save_k_exmaple_from_tensor('a.out', seq_tokens_list, seq_pred, dis_seq_tar, k_example=10)
 
-            loss.backward()
-            
-            acc = torch.sum((pred>0.5)==(target>0.5))
-            
-            if (step+1) % 5 == 0 or step == 0:
-                avg_loss = loss.data.item() / batch_size
-                avg_acc = acc.data.item() / batch_size
 
-                print(f'Loss: {loss:.2f}, Avg loss: {avg_loss:.2f}, Avg accuracy {avg_acc:.2f}')
+            classifcation_loss = loss_opt_fn(seq_pred, dis_seq_tar)
+            #print(classifcation_loss)
+            classifcation_loss.backward()       
+            opt_dis.step()
+            
+            ##############################
+            # Discriminator: perform D(c, G(c))
+            ##############################
+            # Set gradient zero
+            opt_match.zero_grad()
+            # Combine pos, neg examples
+            dis_pair_inp, dis_pair_tar, dis_pair_lengths = prepare_discriminator_data(pos_samples=batch_pos_condition_ids, 
+                                                                                      neg_samples=batch_neg_condition_ids,
+                                                                                      pos_lengths=batch_lengths,
+                                                                                      neg_lengths=batch_lengths)
+            
+            #pair_logits, pair_pred = match_network(dis_pair_inp, lengths=dis_pair_lengths, mode="matching")
+            pair_pred = match_network(dis_pair_inp, dis_pair_lengths)
+            
+            pair_pred = pair_pred.squeeze() # To 1D-tensor
+            # print("pair target", dis_pair_tar[:10])
+            # print("pair pred", pair_pred[:10])
+            # Check
+            # k_example = 10
+            # pair_tokens_list = convert_tensor_to_tokens(dis_pair_inp, tok2id, id2tok, first_k_example=k_example)
+            # save_k_exmaple_from_tensor('b.out', pair_tokens_list, pair_pred, dis_pair_tar, k_example=10)
+            # check_k_exmaple_from_tensor(pair_tokens_list, pair_pred, dis_pair_tar, k_example)
+            
+            # print("pair pred " , pair_pred.shape)  # (batch_size,)
+            # print("pair target", dis_pair_tar.shape)  # (batch_size,)
+            
+            matching_loss = loss_match_fn(pair_pred, dis_pair_tar)
+            matching_loss.backward()   
+            opt_match.step()
+                
+            classification_acc = torch.sum((seq_pred>0.5)==(dis_seq_tar>0.5))
+            matching_acc = torch.sum((pair_pred>0.5)==(dis_pair_tar>0.5))
+            
+            # print("classification after", classifcation_loss.data.item())
+            # print("matching after", matching_loss.data.item())
             
             # Total loss
-            total_loss += loss.data.item()
-            total_accuracy += acc.data.item() # 
+            total_classification_loss += classifcation_loss.data.item()
+            total_matching_loss += matching_loss.data.item()
+            # Total acc
+            total_classification_acc += classification_acc.data.item() 
+            total_matching_acc += matching_acc.data.item() 
 
-            opt.step()
-            # sample_idx = generator.sample(inp=batch_labels,
-            #                               max_len=args.max_seq_length,
-            #                               temperature=0.3,
-            #                               sos_idx=tok2id["[CLS]"],
-            #                               eos_idx=tok2id["[SEP]"])
-            #print(sample_idx)
-            #r = decode_batch(sample_idx, id2tok, UNK_IDX, batch=True)
-            #print(r)
+            if (step+1) % logging_steps == 0 or step == 0:
+                avg_cls_loss = classifcation_loss.data.item() / batch_size
+                avg_cls_acc = classification_acc.data.item() / batch_size
+
+                avg_match_loss = matching_loss.data.item() / batch_size
+                avg_match_acc = matching_acc.data.item() / batch_size
+
+                print(f'Classifcation Loss: {classifcation_loss:.2f}, Avg loss: {avg_cls_loss:.2f}, Avg accuracy {avg_cls_acc:.2f}') 
+                print(f'Matching Loss: {matching_loss:.2f}, Avg loss: {avg_match_loss:.2f}, Avg accuracy {avg_match_acc:.2f}') 
+        ### Convert to python ###
+        # Python list    
+        k_example = 20
+
+        fake_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
+        write_file = get_output_dir(args.output_dir, f'fake.sequence.epoch-{epoch+1}.pred')
+        save_k_exmaple_from_tensor(write_file, fake_tokens_list, seq_pred,  dis_pair_tar, k_example)
+
+        pair_tokens_list = convert_tensor_to_tokens(dis_pair_inp, tok2id, id2tok, first_k_example=k_example)
+        write_file = get_output_dir(args.output_dir, f'condition.epoch-{epoch+1}.pred')
+        save_k_exmaple_from_tensor(write_file, pair_tokens_list, pair_pred, dis_pair_tar, k_example)
+        
+        ### Convert to python ###
+    return ((total_classification_loss, total_matching_loss),
+            (total_classification_acc, total_matching_acc))
             
-            # break
-            # step = 0
-            # if step % 50 == 0:
-            #     r = decode_batch(sample_idx, id2tok, UNK_IDX, batch=True)
-            #     print(r)
 
-       
-
-                
-class Trainer:
-    def __init__(self, model, args, train_dataset=None, eval_dataset=None,
-                tokenizer=None, data_collator=None, compute_metrics=None):
-        return None
-
-    def train():
-        """Adversarial training for CGANs.
-
-        Args:
-          generator
-        """
-        for n_step in range(config.num_steps):
-            # Sample positive examples
-
-            # Sample noise examples
-
-            # obtain generated data 
-            generated_pred = generator()
-
-            # Update discriminator
-            reader.step()
-
-            # Sample noise examples
-
-
-            # Sample conditions
-            batch = None
-
-            # Update generator
-            generator.step()
-
-    def get_train_dataloader(self):
-        return DataLoader()    
 
 
 def get_output_dir(output_dir, file):
@@ -440,14 +457,13 @@ def main():
     vocab.update(condition_list) # Add conditions words to vocab
 
     tok2id = {w: idx for idx, w in enumerate(vocab)}
-    #tok2id["[PAD]"] = -100
     id2tok = {v: k for k, v in tok2id.items()}
 
     vocab_size = len(vocab)
     UNK_IDX = tok2id["[UNK]"]
     PAD_IDX = tok2id["[PAD]"]
     logging.info(f"PAD_IDX: {PAD_IDX}")
-    print("PAD_IDX", PAD_IDX)
+    #print("PAD_IDX", PAD_IDX)
 
     tokenizer_collector = dict()
     tokenizer_collector["vocab"] = vocab
@@ -458,77 +474,87 @@ def main():
 
     ########## Load the custom model, tokenizer and config ##########
     def tokenize_fn(examples, max_seq_len):
-        """Tokenize the input sequence and align the label.
-        `input_ids` and `label_ids` will be added in the feature example (dict).
-        They are required for the forward and loss computation.
-        Addtionally. `-100` in `label_ids` is assigned to segmented tokens
-        and to speical tokens in BERT. Loss function will ignore them.
+        """Add special tokens to input sequence and padd the max lengths.
+        
         Args:
           Examples: dict of features:
-                    {"tokens": [AL-AIN', ',', 'United', 'Arab', 'Emirates', '1996-12-06'],
-                     "pos_tags": [22, 6, 22, 22, 23, 11]}
-        Return:
-          tokenized_inputs: dict of futures including two 
-                            addtional feature: `padded_tokens`,
-                                                `token_ids`,
-                                                `discriminator_inp`
+                    {"tokens": [ 'what', 'was', 'the', 'average', 'in', '2001'],
+                     "label": 3} # label index 
+        
+        Variables:
+          tokens:  
+            [ '[CLS]','what', 'was', 'the', 'average', 'in', '2001', '[SEP]', '[PAD]']
+          condition_tokens:
+            [ '[what]',  '[CLS]','what', 'was', 'the', 'average', 'in', '2001', '[SEP]', '[PAD]']
 
-        Usages:
-        >>> tokenized_dataset = datasets.map(tokenize_fn,
-        >>>                                  batched=True)
-            # Check whether aligned.
-        >>> for example in tokenized_dataset:
-                tokens = example['tokens']
-                input_ids = example['input_ids']
-                tokenized_tokens = tokenizer.convert_ids_to_tokens(input_ids)
-                label_ids = example['label_ids'] # aligned to max length 
-                print(tokens)
-                print(tokenized_tokens)
-                print(input_ids)
-        [ 'SOCCER' ] # token
-        [ [CLS], 'S', '##OC, '##CE', '##R', [SEP] ] #converted_tokens 
-        [ -100 ,  4 , -100,  -100, -11] # label_ids
         """
+        def _pad_sequence(sequence, max_seq_len, n_special_token=0):
+            sent_len = len(sequence)
+            max_seq_len = max_seq_len - n_special_token
+            max_sent_len = max_seq_len if sent_len >= max_seq_len else (sent_len)
+               
+            # Extend words list with special tokens
+            padded_sentence_lst = ["[CLS]"]+ sequence[:max_sent_len] + ["[SEP]"] 
+
+            # [CLS] + sentence + [SEP]
+            padded_len = len(padded_sentence_lst)
+            
+            # Add [PAD]
+            num_pad = max_seq_len+n_special_token - padded_len
+            padded_sentence_lst += ["[PAD]"] * num_pad
+
+            #print(padded_sentence_lst)
+            assert len(padded_sentence_lst) == (max_seq_len+n_special_token)
+            return padded_sentence_lst
+
         feature_dict = dict()
 
         token_col_name = 'tokens'
         label_col_name = 'label'
 
         token_ids = list()
-        sent_len = len(examples[token_col_name])
-
-        # print(examples[token_col_name])
-        # print(sent_len)
-        # print( ["[SEP]"] +["[PAD]"]*0)
-        # truncate sentence 
-        max_seq_len = max_seq_len - 2
-
-        max_sent_len = max_seq_len if sent_len >= max_seq_len else (sent_len)
-    
-        #print(examples[token_col_name])
-        # print("max_seq_len", max_seq_len)
-        # print("max_sent_len", max_sent_len)
         
-        # Extend words list with special tokens
-        #print(examples[token_col_name])
-        padded_sentence_lst = ["[CLE]"]+ examples[token_col_name][:max_sent_len] + ["[SEP]"] 
+        tokens  = examples[token_col_name]
+        sent_len = len(tokens)
 
-        # [CLS] + sentence + [SEP]
-        padded_len = len(padded_sentence_lst)
+        # Positive example
+        label_idx = examples[label_col_name]
+        label_token = condition_list[label_idx]  # [ "[who]", "[when]", "[where]", "[which]" ]
+        label_ids = list(range(len(condition_list)))
+        condition_tokens = [label_token] + examples[token_col_name]
+
+        # Negative example
+        neg_label_idx = label_idx
+        while neg_label_idx == label_idx:
+            neg_label_idx = np.random.choice(label_ids)
+        neg_label = condition_list[neg_label_idx]
         
-        # Add [PAD]
-        num_pad = max_seq_len+2 - padded_len
-        padded_sentence_lst += ["[PAD]"] * num_pad
+        ### Add special token and pad ###
+        # 2 for [CLS] and [SEP]
+        padded_sentence_lst = _pad_sequence(tokens, max_seq_len, 2)
+        padded_condition_sentence_lst = [label_token] + padded_sentence_lst[:-1]
+        padded_neg_condition_sentence_lst = [neg_label] + padded_sentence_lst[:-1]
 
-        #print(padded_sentence_lst)
-        assert len(padded_sentence_lst) == (max_seq_len+2)
+        # Add the length up to [SEP]
+        if "[PAD]" not in padded_sentence_lst:
+            feature_dict["padded_length"] = max_seq_len
+        else:
+            feature_dict["padded_length"] = padded_sentence_lst.index("[PAD]")
 
         # Add padded tokens 
         feature_dict["padded_tokens"]= padded_sentence_lst
-        
-        # Add token ids
+        feature_dict["padded_pos_condition_tokens"]= padded_condition_sentence_lst
+        feature_dict["padded_neg_condition_tokens"]= padded_neg_condition_sentence_lst
+
+        # Add features
         token_ids = [ tok2id[tok] if tok in tok2id else tok2id["[UNK]"] for tok in padded_sentence_lst ]
         feature_dict["token_ids"] = torch.tensor(token_ids)
+
+        condition_token_ids = [ tok2id[tok] if tok in tok2id else tok2id["[UNK]"] for tok in padded_condition_sentence_lst ]
+        feature_dict["pos_condition_token_ids"] = torch.tensor(condition_token_ids)
+
+        neg_condition_token_ids = [ tok2id[tok] if tok in tok2id else tok2id["[UNK]"] for tok in padded_neg_condition_sentence_lst ]
+        feature_dict["neg_condition_token_ids"] = torch.tensor(neg_condition_token_ids)
 
         return feature_dict
 
@@ -568,19 +594,28 @@ def main():
     ### Feature
     # `token_ids`, `labels` for training and loss computation
     def generate_batch(data_batch):
-        """"""
+        """Package feature as mini-batch."""
         features_dict = dict()
-        batch_token_ids, batch_labels = [], []
+        batch_token_ids, batch_labels = list(), list()
         batch_lengths = list() # List of sentence length
+        batch_pos_condition_ids = list()
+        batch_neg_condition_ids = list()
+
+    
         #print("len batch", len(data_batch))
         for batch_group in data_batch:
+
             batch_token_ids.append(batch_group["token_ids"])
             batch_labels.append(batch_group["label"])
-            batch_lengths.append(batch_group["length"])
-    
-        features_dict["batch_token_ids"]=batch_token_ids
-        features_dict["batch_labels"]=batch_labels
-        features_dict["batch_lengths"]=batch_lengths
+            batch_lengths.append(batch_group["padded_length"])
+            batch_pos_condition_ids.append(batch_group["pos_condition_token_ids"])
+            batch_neg_condition_ids.append(batch_group["neg_condition_token_ids"])
+
+        features_dict["batch_token_ids"]= torch.tensor(batch_token_ids)
+        features_dict["batch_labels"]= torch.tensor(batch_labels)
+        features_dict["batch_lengths"]= torch.tensor(batch_lengths)
+        features_dict["batch_pos_condition_ids"] = torch.tensor(batch_pos_condition_ids)
+        features_dict["batch_neg_condition_ids"] = torch.tensor(batch_neg_condition_ids)
         return features_dict
 
     
@@ -596,7 +631,8 @@ def main():
                             padding_idx=PAD_IDX,
                             shared_emb_layer=args.tf_shared_emb_layer, # Whether use embeeding layer from encoder
                             rate=args.tf_dropout_rate)
-    generator.cuda()
+    if cuda_is_available:
+        generator.cuda()
     #generator.apply(init_weights)
     logging.info(generator.encoder)
 
@@ -610,26 +646,40 @@ def main():
     # print(o.shape)
 
     # Construct discriminator
-    discriminator = LSTMEncoder(vocab_size=vocab_size,
-                                embedding_dim=args.rnn_embedding_dims,
-                                lstm_dim=args.rnn_dims,
-                                n_class=args.rnn_classes,
-                                n_layer=args.rnn_layers,
-                                dropout=args.rnn_dropout_rate,
-                                padding_idx=PAD_IDX,
-                                bidirectional=args.rnn_bidirectional)
-    discriminator.cuda()
-    logging.info(discriminator)
+    # discriminator = LSTMEncoder(vocab_size=vocab_size,
+    #                             embedding_dim=args.rnn_embedding_dims,
+    #                             lstm_dim=args.rnn_dims,
+    #                             n_class=args.rnn_classes,
+    #                             n_layer=args.rnn_layers,
+    #                             dropout=args.rnn_dropout_rate,
+    #                             padding_idx=PAD_IDX,
+    #                             bidirectional=True)
+
+    # match_network = LSTMEncoder(vocab_size=vocab_size,
+    #                             embedding_dim=args.rnn_embedding_dims,
+    #                             lstm_dim=args.rnn_dims,
+    #                             n_class=args.rnn_classes,
+    #                             n_layer=args.rnn_layers,
+    #                             dropout=args.rnn_dropout_rate,
+    #                             padding_idx=PAD_IDX,
+    #                             bidirectional=True)
+
+    discriminator = CustomLSTM(vocab_size=vocab_size)
+    match_network = CustomLSTM(vocab_size=vocab_size)
+
     
+    if cuda_is_available:
+        discriminator.cuda()
+        match_network.cuda()
+    logging.info(discriminator)
     
     ### Fetch dataset iterator
     train_iter = DataLoader(train_dataset, batch_size=args.batch_size,
-                           shuffle=False, collate_fn=generate_batch)
+                           shuffle=True, collate_fn=generate_batch)
     eval_iter = DataLoader(eval_dataset, batch_size=args.batch_size,
-                           shuffle=False, collate_fn=generate_batch)
+                           shuffle=True, collate_fn=generate_batch)
     test_iter = DataLoader(test_dataset, batch_size=args.batch_size,
-                           shuffle=False, collate_fn=generate_batch)
-
+                           shuffle=True, collate_fn=generate_batch)
 
     ### Pre-train generator ###
     print("Pre-train the generator")
@@ -638,25 +688,28 @@ def main():
                                     factor=2,
                                     warmup=4000,
                                     optimizer=gen_optimizer)
-    #gen_optimizer =torch.optim.SGD(generator.parameters(), lr=5.0)
-    #scheduler = torch.optim.lr_scheduler.StepLR(optimizer, 1.0, gamma=0.95)
-    train_generator_MLE(generator=generator,
-                        dataset=train_iter,
-                        opt=gen_optimizer,
-                        logging_steps=50, 
-                        epochs=args.mle_epochs,
-                        tokenizer_dict=tokenizer_collector)
+    
+    # train_generator_MLE(generator=generator,
+    #                     dataset=train_iter,
+    #                     opt=gen_optimizer,
+    #                     logging_steps=50, 
+    #                     epochs=args.mle_epochs,
+    #                     tokenizer_dict=tokenizer_collector)
     
     ### Pre-train generator ###
     print("Pre-train discriminator")
-    # dis_optimizer = optim.Adagrad(discriminator.parameters())
-    # train_discriminator(generator=generator, 
-    #                     discriminator=discriminator, 
-    #                     dataset=train_iter,
-    #                     opt=dis_optimizer,
-    #                     steps=1,
-    #                     epochs=1,
-    #                     tokenizer_dict=tokenizer_collector)
+    dis_optimizer = optim.Adam(discriminator.parameters(), lr=1e-2)
+    match_optimizer = optim.Adam(match_network.parameters(), lr=1e-2)
+    train_discriminator(generator=generator, 
+                        discriminator=discriminator,
+                        match_network=match_network,
+                        dataset=train_iter,
+                        opt_dis=dis_optimizer,
+                        opt_match=match_optimizer, 
+                        logging_steps=args.logging_steps,
+                        epochs=1, # args.train_discriminator_epochs
+                        tokenizer_dict=tokenizer_collector,
+                        args=args)
     
     ### Training ###
     # Initialize our adversarial Trainer
@@ -677,4 +730,16 @@ def main():
     
 
 if __name__ == "__main__":
+    m = nn.Sigmoid()
+    loss = nn.BCELoss()
+    inp = torch.randn(3, requires_grad=True)
+    target = torch.empty(3).random_(2)
+    output = loss(m(inp), target)
+
+    print(m(inp))
+    print(m(inp).type())
+    print(target)
+    print(target.type())
+    print(output)
+    output.backward()
     main()

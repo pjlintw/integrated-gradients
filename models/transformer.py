@@ -57,7 +57,7 @@ class Transformer(nn.Module):
         src = self.embedding_layer(src)
 
         # (batch_size, inp_seq_len, d_model)
-        enc_out = self.encoder(src, training, enc_padding_mask).cuda()
+        enc_out = self.encoder(src, training, enc_padding_mask) #.cuda()
 
         # print("type of decoder input", type(tgt))
         # print("decoder input", tgt)
@@ -73,7 +73,7 @@ class Transformer(nn.Module):
 
         return final_output, dec_attn
 
-    def sample(self, inp, max_len, temperature, sos_idx, eos_idx):
+    def sample(self, inp, max_len, temperature, training, sos_idx, eos_idx):
         """Forward propagate for transformer.
         
         Args:
@@ -82,35 +82,37 @@ class Transformer(nn.Module):
           temperature
           sos_idx
           eos_idx
-          
-            
+
+        Returns:
+          out: (batch_size, max_len)
         """
         if torch.is_tensor(inp):
             pass
         else:
             inp = torch.tensor(inp)
 
-        eps = 1e-10        
+
         # Gumbel-Softmax tricks
         batch_size = inp.shape[0]
         #sampled_ids = torch.zeros(batch_size, max_len).type(torch.LongTensor)
 
         # (batch_size, 1)
-        output = torch.tensor([sos_idx]*batch_size).unsqueeze(1)      
+        output = torch.tensor([sos_idx]*batch_size).unsqueeze(1) 
         
         assert output.shape[-1] == 1 
 
-        for i in range(max_len):
+
+        for i in range(max_len-1):
             # enc_pad_mask, combined_mask, dec_pad_mask
             enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx)
 
             # predictions.shape == (batch_size, seq_len, vocab_size)
             predictions, _ = self.forward(inp,    # (bathc_size, 1)
-                                         output, # (batch_size, 1-TO-MAXLEN)
-                                         True,
-                                         enc_padding_mask,
-                                         combined_mask,
-                                         dec_padding_mask)
+                                          output,  # (batch_size, 1-TO-MAXLEN)
+                                          training,
+                                          enc_padding_mask,
+                                          combined_mask,
+                                          dec_padding_mask)
             
             # Select the last word from the seq_len dimension
             # (batch_size, 1, vocab_size) to (batch_size, voacb_size) 
@@ -123,11 +125,10 @@ class Transformer(nn.Module):
             # (batch_size, vocab_size)
             # print("gumbel", gumbel_distribution.shape)
 
-            # (batch_size,) to (bathc_size, 1)
+            # (batch_sizes) to (bathc_size, 1)
             predicted_idx = torch.argmax(gumbel_distribution, dim=-1).unsqueeze(1)
             
             # print("pred idx", predicted_idx.shape)
-
             output = torch.cat((output, predicted_idx), 1)
             
             # Update along with col
