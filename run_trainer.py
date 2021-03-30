@@ -178,11 +178,9 @@ def train_generator_MLE(generator,
             opt.step()
 
             if (step+1) % logging_steps == 0:
-                msg = f"Step: {step+1}, Loss: {loss.item():.2f}"
+                msg = f"Model: generator, Step: {step+1}, Loss: {loss.item():.2f}"
                 logging.info(msg)
                 print(msg)
-
-            break
 
             # NLLLoss(inp, target)
             # inp: (batch)
@@ -194,8 +192,8 @@ def train_generator_MLE(generator,
             # print("token1", decode_batch(gen_inp, id2tok, unk_idx)[0])
             # print("token1", decode_batch(gen_target, id2tok, unk_idx)[0])
         pred_sentences = decode_batch(gen_inp, id2tok, unk_idx)
-        print("Done", "", pred_sentences[0])
-        print(pred_sentences[1])
+        #print("Done", "", pred_sentences[0])
+        #print(pred_sentences[1])
     return None
 
 
@@ -300,7 +298,7 @@ def train_discriminator(generator,
             generator_loss =  loss_gen_fn(seq_pred, dis_seq_tar)
             
             (-generator_loss).backward(retain_graph=True)       
-            print("generator_loss", -generator_loss)
+            print("generator_loss", -generator_loss.data)
             opt_gen.step()
             ### Adversarial Training ###
 

@@ -1,9 +1,9 @@
-10:28:58, 208 __main__ INFO Namespace(batch_size=48, dataset_script='wiki-table-questions.py', do_eval=True, do_predict=True, do_train=True, eval_steps=10, gpu=False, logging_first_step='True', logging_steps=1, max_seq_length=20, max_steps=50, max_test_samples=200, max_train_samples=None, max_val_samples=200, mle_epochs=3, model_name_or_path='textgan', output_dir='results/cgan-exp-1', rnn_bidirectional=False, rnn_classes=1, rnn_dims=256, rnn_dropout_rate=0.1, rnn_embedding_dims=256, rnn_layers=1, tf_dims=512, tf_dropout_rate=0.1, tf_embedding_dims=256, tf_heads=8, tf_layers=2, tf_learning_rate=0.01, tf_shared_emb_layer=False, train_discriminator_epochs=1, vocab='data/wikiTable/word.vocab')
-10:28:58, 209 __main__ INFO Saving hyperparameters to: results/cgan-exp-1/hyparams.txt
-10:28:58, 234 datasets.builder WARNING Reusing dataset wiki_table_questions (/Users/linus/.cache/huggingface/datasets/wiki_table_questions/WikiTableQuestions/0.0.0/6a4116117d81a3d888218d55619bdb3ba81a1942ee880bf11b7f64a30e2f8e1a)
-10:28:58, 261 __main__ INFO Loading Datasets
-10:28:58, 274 root INFO PAD_IDX: 10642
-10:29:01, 361 root INFO TransformerEncoder(
+13:01:57, 938 __main__ INFO Namespace(batch_size=48, dataset_script='wiki-table-questions.py', do_eval=True, do_predict=True, do_train=True, eval_steps=10, gpu=False, logging_first_step='True', logging_steps=5, max_seq_length=20, max_steps=30, max_test_samples=200, max_train_samples=None, max_val_samples=200, mle_epochs=3, model_name_or_path='textgan', output_dir='results/cgan-exp-1', rnn_bidirectional=False, rnn_classes=1, rnn_dims=256, rnn_dropout_rate=0.1, rnn_embedding_dims=256, rnn_layers=1, tf_dims=512, tf_dropout_rate=0.1, tf_embedding_dims=256, tf_heads=8, tf_layers=2, tf_learning_rate=0.01, tf_shared_emb_layer=False, train_discriminator_epochs=1, vocab='data/wikiTable/word.vocab')
+13:01:57, 939 __main__ INFO Saving hyperparameters to: results/cgan-exp-1/hyparams.txt
+13:01:57, 949 datasets.builder WARNING Reusing dataset wiki_table_questions (/home/CE/pinjie/.cache/huggingface/datasets/wiki_table_questions/WikiTableQuestions/0.0.0/6a4116117d81a3d888218d55619bdb3ba81a1942ee880bf11b7f64a30e2f8e1a)
+13:01:57, 962 __main__ INFO Loading Datasets
+13:01:57, 972 root INFO PAD_IDX: 4415
+13:02:00, 798 root INFO TransformerEncoder(
   (enc_layers): ModuleList(
     (0): TransformerEncLayer(
       (mha): MultiHeadAttention(
@@ -40,9 +40,81 @@
   )
   (dropout): Dropout(p=0.1, inplace=False)
 )
-10:29:01, 420 root INFO CustomLSTM(
+13:02:00, 872 root INFO CustomLSTM(
   (embedding): Embedding(11471, 300)
   (lstm): LSTM(300, 128, batch_first=True, bidirectional=True)
   (drop): Dropout(p=0.5, inplace=False)
   (fc): Linear(in_features=256, out_features=1, bias=True)
 )
+13:02:14, 41 root INFO Model: generator, Step: 50, Loss: 7.68
+13:02:26, 809 root INFO Model: generator, Step: 100, Loss: 6.10
+13:02:39, 426 root INFO Model: generator, Step: 150, Loss: 4.93
+13:02:52, 142 root INFO Model: generator, Step: 200, Loss: 4.67
+13:03:16, 235 root INFO Model: generator, Step: 50, Loss: 4.11
+13:03:28, 959 root INFO Model: generator, Step: 100, Loss: 4.04
+13:03:41, 616 root INFO Model: generator, Step: 150, Loss: 4.29
+13:03:54, 185 root INFO Model: generator, Step: 200, Loss: 3.94
+13:04:18, 236 root INFO Model: generator, Step: 50, Loss: 3.84
+13:04:30, 855 root INFO Model: generator, Step: 100, Loss: 3.56
+13:04:43, 438 root INFO Model: generator, Step: 150, Loss: 3.41
+13:04:55, 864 root INFO Model: generator, Step: 200, Loss: 3.61
+13:05:07, 992 root INFO Step: 1, Classifcation Loss: 32.56, Classification Acc: 30.00
+13:05:07, 993 root INFO Step: 1, Matching Loss: 33.66, Matching Acc: 22.00
+13:05:08, 583 root INFO Step: 2, Classifcation Loss: 31.73, Classification Acc: 33.00
+13:05:08, 583 root INFO Step: 2, Matching Loss: 26.85, Matching Acc: 36.00
+13:05:09, 191 root INFO Step: 3, Classifcation Loss: 32.10, Classification Acc: 29.00
+13:05:09, 191 root INFO Step: 3, Matching Loss: 23.92, Matching Acc: 36.00
+13:05:09, 786 root INFO Step: 4, Classifcation Loss: 32.33, Classification Acc: 28.00
+13:05:09, 787 root INFO Step: 4, Matching Loss: 21.13, Matching Acc: 38.00
+13:05:10, 380 root INFO Step: 5, Classifcation Loss: 31.77, Classification Acc: 33.00
+13:05:10, 380 root INFO Step: 5, Matching Loss: 15.54, Matching Acc: 43.00
+13:05:10, 980 root INFO Step: 6, Classifcation Loss: 31.84, Classification Acc: 32.00
+13:05:10, 980 root INFO Step: 6, Matching Loss: 23.61, Matching Acc: 35.00
+13:05:11, 544 root INFO Step: 7, Classifcation Loss: 32.09, Classification Acc: 31.00
+13:05:11, 544 root INFO Step: 7, Matching Loss: 16.41, Matching Acc: 39.00
+13:05:12, 117 root INFO Step: 8, Classifcation Loss: 31.24, Classification Acc: 38.00
+13:05:12, 117 root INFO Step: 8, Matching Loss: 12.35, Matching Acc: 44.00
+13:05:12, 703 root INFO Step: 9, Classifcation Loss: 32.46, Classification Acc: 31.00
+13:05:12, 703 root INFO Step: 9, Matching Loss: 15.17, Matching Acc: 43.00
+13:05:13, 301 root INFO Step: 10, Classifcation Loss: 31.67, Classification Acc: 34.00
+13:05:13, 301 root INFO Step: 10, Matching Loss: 7.37, Matching Acc: 47.00
+13:05:13, 934 root INFO Step: 11, Classifcation Loss: 31.84, Classification Acc: 32.00
+13:05:13, 935 root INFO Step: 11, Matching Loss: 14.54, Matching Acc: 45.00
+13:05:14, 502 root INFO Step: 12, Classifcation Loss: 32.42, Classification Acc: 28.00
+13:05:14, 503 root INFO Step: 12, Matching Loss: 12.45, Matching Acc: 45.00
+13:05:15, 66 root INFO Step: 13, Classifcation Loss: 32.75, Classification Acc: 28.00
+13:05:15, 66 root INFO Step: 13, Matching Loss: 8.54, Matching Acc: 46.00
+13:05:15, 571 root INFO Step: 14, Classifcation Loss: 32.18, Classification Acc: 30.00
+13:05:15, 571 root INFO Step: 14, Matching Loss: 12.07, Matching Acc: 46.00
+13:05:16, 135 root INFO Step: 15, Classifcation Loss: 32.10, Classification Acc: 31.00
+13:05:16, 135 root INFO Step: 15, Matching Loss: 6.35, Matching Acc: 47.00
+13:05:16, 908 root INFO Step: 16, Classifcation Loss: 32.56, Classification Acc: 31.00
+13:05:16, 908 root INFO Step: 16, Matching Loss: 3.20, Matching Acc: 48.00
+13:05:17, 484 root INFO Step: 17, Classifcation Loss: 31.92, Classification Acc: 30.00
+13:05:17, 484 root INFO Step: 17, Matching Loss: 2.81, Matching Acc: 48.00
+13:05:18, 76 root INFO Step: 18, Classifcation Loss: 31.78, Classification Acc: 32.00
+13:05:18, 76 root INFO Step: 18, Matching Loss: 4.96, Matching Acc: 47.00
+13:05:18, 659 root INFO Step: 19, Classifcation Loss: 32.68, Classification Acc: 25.00
+13:05:18, 659 root INFO Step: 19, Matching Loss: 8.90, Matching Acc: 45.00
+13:05:19, 272 root INFO Step: 20, Classifcation Loss: 31.85, Classification Acc: 33.00
+13:05:19, 273 root INFO Step: 20, Matching Loss: 4.43, Matching Acc: 47.00
+13:05:19, 911 root INFO Step: 21, Classifcation Loss: 32.38, Classification Acc: 31.00
+13:05:19, 911 root INFO Step: 21, Matching Loss: 2.52, Matching Acc: 48.00
+13:05:20, 423 root INFO Step: 22, Classifcation Loss: 32.58, Classification Acc: 27.00
+13:05:20, 423 root INFO Step: 22, Matching Loss: 1.31, Matching Acc: 48.00
+13:05:20, 959 root INFO Step: 23, Classifcation Loss: 31.91, Classification Acc: 29.00
+13:05:20, 959 root INFO Step: 23, Matching Loss: 4.16, Matching Acc: 46.00
+13:05:21, 592 root INFO Step: 24, Classifcation Loss: 32.15, Classification Acc: 29.00
+13:05:21, 592 root INFO Step: 24, Matching Loss: 2.25, Matching Acc: 47.00
+13:05:22, 144 root INFO Step: 25, Classifcation Loss: 31.53, Classification Acc: 31.00
+13:05:22, 144 root INFO Step: 25, Matching Loss: 1.59, Matching Acc: 48.00
+13:05:22, 783 root INFO Step: 26, Classifcation Loss: 32.03, Classification Acc: 29.00
+13:05:22, 783 root INFO Step: 26, Matching Loss: 2.76, Matching Acc: 48.00
+13:05:23, 320 root INFO Step: 27, Classifcation Loss: 32.15, Classification Acc: 31.00
+13:05:23, 320 root INFO Step: 27, Matching Loss: 4.12, Matching Acc: 47.00
+13:05:23, 919 root INFO Step: 28, Classifcation Loss: 32.25, Classification Acc: 33.00
+13:05:23, 919 root INFO Step: 28, Matching Loss: 1.00, Matching Acc: 48.00
+13:05:24, 486 root INFO Step: 29, Classifcation Loss: 31.81, Classification Acc: 34.00
+13:05:24, 486 root INFO Step: 29, Matching Loss: 10.33, Matching Acc: 46.00
+13:05:25, 87 root INFO Step: 30, Classifcation Loss: 31.65, Classification Acc: 35.00
+13:05:25, 87 root INFO Step: 30, Matching Loss: 3.44, Matching Acc: 47.00
