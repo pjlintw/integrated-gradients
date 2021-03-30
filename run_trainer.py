@@ -106,8 +106,6 @@ def build_vocab(vocab_file, min_count=0):
 
     Args:
       vocab_file: path  
-
-    Returns
     """
     vocab = set()
     with open(vocab_file, "r") as f:
@@ -200,10 +198,12 @@ def train_generator_MLE(generator,
         print(pred_sentences[1])
     return None
 
+
 def train_discriminator(generator, 
                         discriminator, 
                         match_network,
                         dataset,
+                        opt_gen,
                         opt_dis,
                         opt_match, 
                         logging_steps=50, 
@@ -222,6 +222,7 @@ def train_discriminator(generator,
     unk_idx = tokenizer_dict["tok2id"]["[UNK]"]
     pad_idx = tokenizer_dict["tok2id"]["[PAD]"]
 
+    loss_gen_fn = nn.BCELoss(size_average=False)
     loss_opt_fn = nn.BCELoss(size_average=False)
     loss_match_fn = nn.BCELoss(size_average=False)
     total_loss = list()
@@ -263,10 +264,12 @@ def train_discriminator(generator,
             ######################
             # Generator 
             ######################
+            opt_gen.zero_grad()
+
             # (batch_size, max_seq_len)
             fake_seq = generator.sample(inp=batch_labels,
                                         max_len=args.max_seq_length,
-                                        temperature=0.3,
+                                        temperature=0.5,
                                         training=False,
                                         sos_idx=tok2id["[CLS]"],
                                         eos_idx=tok2id["[SEP]"],
@@ -291,15 +294,20 @@ def train_discriminator(generator,
             #seq_logits, seq_pred = discriminator(dis_seq_inp, lengths=seq_lengths, mode="classification")
             seq_pred = discriminator(dis_seq_inp, seq_lengths)
             seq_pred = seq_pred.squeeze() # To 1D-tensor
-            
+        
 
-            print(dis_seq_tar[:10])
-            print(seq_pred[:10])
+            ### Adversarial Training ###
+            generator_loss =  loss_gen_fn(seq_pred, dis_seq_tar)
+            
+            (-generator_loss).backward(retain_graph=True)       
+            print("generator_loss", -generator_loss)
+            opt_gen.step()
+            ### Adversarial Training ###
+
             # Check
             # k_example = 10
             # seq_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
             # save_k_exmaple_from_tensor('a.out', seq_tokens_list, seq_pred, dis_seq_tar, k_example=10)
-
 
             classifcation_loss = loss_opt_fn(seq_pred, dis_seq_tar)
             #print(classifcation_loss)
@@ -320,25 +328,14 @@ def train_discriminator(generator,
             
             #pair_logits, pair_pred = match_network(dis_pair_inp, lengths=dis_pair_lengths, mode="matching")
             pair_pred = match_network(dis_pair_inp, dis_pair_lengths)
-            
             pair_pred = pair_pred.squeeze() # To 1D-tensor
-            # print("pair target", dis_pair_tar[:10])
-            # print("pair pred", pair_pred[:10])
-            # Check
-            # k_example = 10
-            # pair_tokens_list = convert_tensor_to_tokens(dis_pair_inp, tok2id, id2tok, first_k_example=k_example)
-            # save_k_exmaple_from_tensor('b.out', pair_tokens_list, pair_pred, dis_pair_tar, k_example=10)
-            # check_k_exmaple_from_tensor(pair_tokens_list, pair_pred, dis_pair_tar, k_example)
-            
-            # print("pair pred " , pair_pred.shape)  # (batch_size,)
-            # print("pair target", dis_pair_tar.shape)  # (batch_size,)
             
             matching_loss = loss_match_fn(pair_pred, dis_pair_tar)
             matching_loss.backward()   
             opt_match.step()
                 
-            classification_acc = torch.sum((seq_pred>0.5)==(dis_seq_tar>0.5))
-            matching_acc = torch.sum((pair_pred>0.5)==(dis_pair_tar>0.5))
+            classification_acc = torch.sum((seq_pred>0.5)==(dis_seq_tar>0.5)) 
+            matching_acc = torch.sum((pair_pred>0.5)==(dis_pair_tar>0.5)) 
             
             # print("classification after", classifcation_loss.data.item())
             # print("matching after", matching_loss.data.item())
@@ -347,38 +344,49 @@ def train_discriminator(generator,
             total_classification_loss += classifcation_loss.data.item()
             total_matching_loss += matching_loss.data.item()
             # Total acc
-            total_classification_acc += classification_acc.data.item() 
-            total_matching_acc += matching_acc.data.item() 
+            total_classification_acc += classification_acc.data.item()
+            total_matching_acc += matching_acc.data.item()
 
+            # Write to logger 
+            logging.info(f'Step: {step+1}, Classifcation Loss: {classifcation_loss:.2f}, Classification Acc: {classification_acc:.2f}') 
+            logging.info(f'Step: {step+1}, Matching Loss: {matching_loss:.2f}, Matching Acc: {matching_acc:.2f}') 
+            
+            # logging loss
             if (step+1) % logging_steps == 0 or step == 0:
                 avg_cls_loss = classifcation_loss.data.item() / batch_size
-                avg_cls_acc = classification_acc.data.item() / batch_size
+                avg_cls_acc= classification_acc.data.item() / batch_size
 
-                avg_match_loss = matching_loss.data.item() / batch_size
+                avg_match_loss =matching_loss.data.item() / batch_size
                 avg_match_acc = matching_acc.data.item() / batch_size
 
                 print(f'Step: {step+1}, Classifcation Loss: {classifcation_loss:.2f}, Avg loss: {avg_cls_loss:.2f}, Avg accuracy {avg_cls_acc:.2f}') 
                 print(f'Step: {step+1}, Matching Loss: {matching_loss:.2f}, Avg loss: {avg_match_loss:.2f}, Avg accuracy {avg_match_acc:.2f}') 
+            
+                ### Convert to python ###
+                # Python list    
+                k_example = 20
+
+                fake_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
+                write_file = get_output_dir(args.output_dir, f'fake.sequence.epoch-{epoch+1}.step-{step+1}.pred')
+                save_k_exmaple_from_tensor(write_file, fake_tokens_list, seq_pred,  dis_seq_tar, k_example)
+
+                pair_tokens_list = convert_tensor_to_tokens(dis_pair_inp, tok2id, id2tok, first_k_example=k_example)
+                write_file = get_output_dir(args.output_dir, f'condition.epoch-{epoch+1}.step-{step+1}.pred')
+                save_k_exmaple_from_tensor(write_file, pair_tokens_list, pair_pred, dis_pair_tar, k_example)
+
+                # Save model
+                pt_file_dis = get_output_dir(args.output_dir, f"ckpt/dis.epoch-{epoch+1}.step-{step+1}.pt")
+                pt_file_match = get_output_dir(args.output_dir, f"ckpt/match.epoch-{epoch+1}.step-{step+1}.pt")
+                torch.save(discriminator.state_dict(), pt_file_dis)
+                torch.save(match_network, pt_file_match)
             if step+1 == args.max_steps:
                 break
                 sys.stdout.flush()
-        ### Convert to python ###
-        # Python list    
-        k_example = 20
-
-        fake_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
-        write_file = get_output_dir(args.output_dir, f'fake.sequence.epoch-{epoch+1}.pred')
-        save_k_exmaple_from_tensor(write_file, fake_tokens_list, seq_pred,  dis_pair_tar, k_example)
-
-        pair_tokens_list = convert_tensor_to_tokens(dis_pair_inp, tok2id, id2tok, first_k_example=k_example)
-        write_file = get_output_dir(args.output_dir, f'condition.epoch-{epoch+1}.pred')
-        save_k_exmaple_from_tensor(write_file, pair_tokens_list, pair_pred, dis_pair_tar, k_example)
         
         ### Convert to python ###
     return ((total_classification_loss, total_matching_loss),
             (total_classification_acc, total_matching_acc))
             
-
 
 
 def get_output_dir(output_dir, file):
@@ -420,6 +428,8 @@ def main():
     # Logger
     logger = logging.getLogger(__name__)
     build_dirs(output_dir, logger)
+    build_dirs(pathlib.Path(output_dir, "ckpt"), logger)
+    
 
     log_file = get_output_dir(output_dir, 'example.log')
     logging.basicConfig(filename=log_file,
@@ -438,10 +448,7 @@ def main():
     datasets = load_dataset(args.dataset_script)
     logger.info("Loading Datasets")
 
-    for i in datasets["train"]:
-        print(i)
-        break
-
+    
     ### Access column names and features ###
     if args.do_train:
         column_names = datasets["train"].column_names
@@ -661,29 +668,8 @@ def main():
     out = torch.tensor([1,0,1,1])
     tar = torch.tensor([0,0,1,1])
     batch_size = tar.shape[0]
-    print(torch.sum((out>0.5)==(tar>0.5)).data/batch_size)
-            
-    # o = torch.tensor([tok2id["[CLS]"]]*10).unsqueeze(0)
-    # print(o.shape)
+    #print(torch.sum((out>0.5)==(tar>0.5)).data/batch_size)
 
-    # Construct discriminator
-    # discriminator = LSTMEncoder(vocab_size=vocab_size,
-    #                             embedding_dim=args.rnn_embedding_dims,
-    #                             lstm_dim=args.rnn_dims,
-    #                             n_class=args.rnn_classes,
-    #                             n_layer=args.rnn_layers,
-    #                             dropout=args.rnn_dropout_rate,
-    #                             padding_idx=PAD_IDX,
-    #                             bidirectional=True)
-
-    # match_network = LSTMEncoder(vocab_size=vocab_size,
-    #                             embedding_dim=args.rnn_embedding_dims,
-    #                             lstm_dim=args.rnn_dims,
-    #                             n_class=args.rnn_classes,
-    #                             n_layer=args.rnn_layers,
-    #                             dropout=args.rnn_dropout_rate,
-    #                             padding_idx=PAD_IDX,
-    #                             bidirectional=True)
 
     discriminator = CustomLSTM(vocab_size=vocab_size)
     match_network = CustomLSTM(vocab_size=vocab_size)
@@ -703,8 +689,8 @@ def main():
     test_iter = DataLoader(test_dataset, batch_size=args.batch_size,
                            shuffle=True, collate_fn=generate_batch_fn)
 
-    ### Pre-train generator ###
-    print("Pre-train the generator")
+    ### train generator ###
+    print("train the generator")
     gen_optimizer = optim.Adam(generator.parameters(), lr=0, betas=(0.9,0.98), eps=1e-9)
     gen_optimizer = WarmupScheduler(model_size=args.tf_dims,
                                     factor=2,
@@ -719,14 +705,16 @@ def main():
                          tokenizer_dict=tokenizer_collector,
                          args=args)
     
-    ### Pre-train generator ###
-    print("Pre-train discriminator")
+    ### train Discriminator ###
+    print("train discriminator")
     dis_optimizer = optim.Adam(discriminator.parameters(), lr=1e-2)
     match_optimizer = optim.Adam(match_network.parameters(), lr=1e-2)
+    gen_optimizer = optim.Adam(generator.parameters(), lr=1e-2)
     train_discriminator(generator=generator, 
                         discriminator=discriminator,
                         match_network=match_network,
                         dataset=train_iter,
+                        opt_gen=gen_optimizer,
                         opt_dis=dis_optimizer,
                         opt_match=match_optimizer, 
                         logging_steps=args.logging_steps,
@@ -748,21 +736,5 @@ def main():
     # )
     
 
-    ### Evalutation ### 
-    return None
-    
-
 if __name__ == "__main__":
-    m = nn.Sigmoid()
-    loss = nn.BCELoss()
-    inp = torch.randn(3, requires_grad=True)
-    target = torch.empty(3).random_(2)
-    output = loss(m(inp), target)
-
-    print(m(inp))
-    print(m(inp).type())
-    print(target)
-    print(target.type())
-    print(output)
-    output.backward()
     main()
