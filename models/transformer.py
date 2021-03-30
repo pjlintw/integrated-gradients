@@ -46,7 +46,7 @@ class Transformer(nn.Module):
     
         
     def forward(self, src, tgt, training, enc_padding_mask,
-                look_ahead_mask, dec_padding_mask):
+                look_ahead_mask, dec_padding_mask, cuda):
         """Forward propagate for transformer.
         
         Args:
@@ -57,8 +57,10 @@ class Transformer(nn.Module):
         src = self.embedding_layer(src)
 
         # (batch_size, inp_seq_len, d_model)
-        enc_out = self.encoder(src, training, enc_padding_mask) #.cuda()
+        enc_out = self.encoder(src, training, enc_padding_mask, gpu=cuda) #.cuda()
 
+        if cuda:
+            enc_out = enc_out.cuda()
         # print("type of decoder input", type(tgt))
         # print("decoder input", tgt)
         # (batch_size, tgt_seq_len, d_model)
@@ -66,14 +68,15 @@ class Transformer(nn.Module):
                                             enc_output=enc_out, 
                                             training=training, 
                                             look_ahead_mask=look_ahead_mask,
-                                            padding_mask=dec_padding_mask)
+                                            padding_mask=dec_padding_mask,
+                                            gpu=cuda)
 
         # (batch_size, tgt_seq_len, target_vcoab_size)
         final_output = self.final_layer(dec_output)
 
         return final_output, dec_attn
 
-    def sample(self, inp, max_len, temperature, training, sos_idx, eos_idx):
+    def sample(self, inp, max_len, temperature, training, sos_idx, eos_idx, cuda):
         """Forward propagate for transformer.
         
         Args:
@@ -91,28 +94,32 @@ class Transformer(nn.Module):
         else:
             inp = torch.tensor(inp)
 
+        if cuda:
+            inp = inp.cuda()
 
         # Gumbel-Softmax tricks
         batch_size = inp.shape[0]
         #sampled_ids = torch.zeros(batch_size, max_len).type(torch.LongTensor)
 
         # (batch_size, 1)
-        output = torch.tensor([sos_idx]*batch_size).unsqueeze(1) 
+        output = torch.tensor([sos_idx]*batch_size).unsqueeze(1)
         
         assert output.shape[-1] == 1 
 
+        if cuda:
+            output = output.cuda()
 
         for i in range(max_len-1):
             # enc_pad_mask, combined_mask, dec_pad_mask
-            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx)
-
+            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx,gpu=cuda)
             # predictions.shape == (batch_size, seq_len, vocab_size)
             predictions, _ = self.forward(inp,    # (bathc_size, 1)
                                           output,  # (batch_size, 1-TO-MAXLEN)
                                           training,
                                           enc_padding_mask,
                                           combined_mask,
-                                          dec_padding_mask)
+                                          dec_padding_mask,
+                                          cuda=cuda)
             
             # Select the last word from the seq_len dimension
             # (batch_size, 1, vocab_size) to (batch_size, voacb_size) 
@@ -121,7 +128,7 @@ class Transformer(nn.Module):
 
             # (batch_size, 1)
             #assert inp.shape[-1] = 1
-            gumbel_distribution = gumbel_softmax_sample(predictions, temperature)
+            gumbel_distribution = gumbel_softmax_sample(predictions, temperature,gpu=cuda)
             # (batch_size, vocab_size)
             # print("gumbel", gumbel_distribution.shape)
 
@@ -144,13 +151,16 @@ def sample_gumbel(shape, eps=1e-20):
     return -torch.log(-torch.log(noise+eps)+eps)
 
 
-def gumbel_softmax_sample(logits, temperature):
+def gumbel_softmax_sample(logits, temperature, gpu):
     """Sample from Gumbel softmax distribution.
     Reference:
         1. Gumbel distribution: https://en.wikipedia.org/wiki/Gumbel_distribution
         2. Inverse Tranform Sampling: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     """
-    y = logits + sample_gumbel(logits.shape)
+    if gpu:
+        y = logits + sample_gumbel(logits.shape).cuda()
+    else:
+        y = logits + sample_gumbel(logits.shape)
     return nn.functional.softmax(y/temperature, dim=-1)
 
 

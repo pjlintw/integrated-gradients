@@ -54,7 +54,7 @@ class TransformerEncoder(nn.Module):
         self.dropout = nn.Dropout(p=rate)
 
 
-    def forward(self, src, training, mask):
+    def forward(self, src, training, mask, gpu=False):
         """Transformer encoder.
 
         Args:
@@ -66,7 +66,11 @@ class TransformerEncoder(nn.Module):
         #print("source length", seq_len)
         x = torch.mul(x, (self.d_model**(1/2)))
         #print(x.shape)
-        x += self.pos_encoding[:, :seq_len, :] #.cuda()
+        if gpu:
+            x += self.pos_encoding[:, :seq_len, :].cuda()
+        else:
+            x += self.pos_encoding[:, :seq_len, :]
+
 
         if training is True:
             x = self.dropout(x)

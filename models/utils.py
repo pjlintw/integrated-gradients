@@ -48,7 +48,7 @@ def convert_tensor_to_tokens(tensor_inp, tok2id, id2tok, first_k_example=None):
             break
     return examples
 
-def prepare_discriminator_data(pos_samples, neg_samples, pos_lengths, neg_lengths):
+def prepare_discriminator_data(pos_samples, neg_samples, pos_lengths, neg_lengths, gpu=False):
     """Combine positive and negative examples into a mini-batch.
     
     Args:
@@ -77,6 +77,11 @@ def prepare_discriminator_data(pos_samples, neg_samples, pos_lengths, neg_length
     target = target[perm]
     inp = inp[perm]
     lengths = lengths[perm]
+
+    if gpu:
+        target=target.cuda()
+        inp=inp.cuda()
+
     return inp, target, lengths
 
 
@@ -131,7 +136,7 @@ def create_look_ahead_mask(seq_len):
     return mask
 
 
-def create_transformer_masks(src, tgt, pad_idx):
+def create_transformer_masks(src, tgt, pad_idx, gpu=False):
     """Creating three masks for TransformerEncoder and -Decoder 
     Args:
         src: shape (batch_size, src_len)
@@ -151,9 +156,14 @@ def create_transformer_masks(src, tgt, pad_idx):
     # Used in the 1st attention block in the decoder.
     # It is used to pad and mask future tokens in the input received by
     # the decoder.
-    look_ahead_mask = create_look_ahead_mask(tgt.shape[1])
-    dec_target_padding_mask = create_padding_mask(tgt, pad_idx)
-    combined_mask = torch.maximum(dec_target_padding_mask, look_ahead_mask) #.cuda()
+    if gpu:
+        look_ahead_mask = create_look_ahead_mask(tgt.shape[1]).cuda()
+        dec_target_padding_mask = create_padding_mask(tgt, pad_idx).cuda()
+    else:
+         look_ahead_mask = create_look_ahead_mask(tgt.shape[1])
+         dec_target_padding_mask = create_padding_mask(tgt, pad_idx)
+
+    combined_mask = torch.maximum(dec_target_padding_mask, look_ahead_mask)
 
     return enc_pad_mask, combined_mask, dec_pad_mask
 
