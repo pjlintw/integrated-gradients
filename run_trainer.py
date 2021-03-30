@@ -251,7 +251,7 @@ def train_discriminator(generator,
             #dis_pair_tar = dis_pair_tar.unsqueeze(1)
             batch_size = batch_token_ids.shape[0]
             # To 2D tensor
-            batch_labels = batch_labels.unsqueeze(1) #.cuda()    
+            batch_labels = batch_labels.unsqueeze(1).cuda()    
             # Sample a batch of sequences from generator 
             fake_seq_target = torch.zeros(batch_size, 1)
         
