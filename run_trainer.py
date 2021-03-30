@@ -184,6 +184,8 @@ def train_generator_MLE(generator,
                 logging.info(msg)
                 print(msg)
 
+            break
+
             # NLLLoss(inp, target)
             # inp: (batch)
             # target: (batch_size, seq_len-1)
@@ -275,6 +277,7 @@ def train_discriminator(generator,
                                                                                pos_lengths=batch_lengths,
                                                                                neg_lengths=batch_lengths,
                                                                                gpu=args.gpu)
+            
             ##############################
             # Discriminator: perform D(x)
             ##############################
@@ -289,6 +292,9 @@ def train_discriminator(generator,
             seq_pred = discriminator(dis_seq_inp, seq_lengths)
             seq_pred = seq_pred.squeeze() # To 1D-tensor
             
+
+            print(dis_seq_tar[:10])
+            print(seq_pred[:10])
             # Check
             # k_example = 10
             # seq_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)

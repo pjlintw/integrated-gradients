@@ -159,7 +159,7 @@ To train the architecture, you have to pass the arguments for dataset loading an
  --output_dir results/cgan-exp-1 \
  --vocab data/wikiTable/word.vocab \
  --dataset_script wiki-table-questions.py \
- --max_seq_length 39 \
+ --max_seq_length 20 \
  --batch_size 48 \
  --do_train True \
  --do_eval True \
@@ -167,7 +167,7 @@ To train the architecture, you have to pass the arguments for dataset loading an
  --max_val_samples 200 \
  --max_test_samples 200 \
  --logging_first_step True \
- --logging_steps 5 \
+ --logging_steps 50 \
  --eval_steps 10
 ```
 
