@@ -5,6 +5,22 @@ from .encoder import TransformerEncoder
 from .decoder import TransformerDecoder
 
 
+def build_vocab(vocab_file, min_count=0):
+    """Build vocabulary from file.
+
+    Args:
+      vocab_file: path  
+    """
+    vocab = set()
+    with open(vocab_file, "r") as f:
+        for line in f:
+            if line == "\n":
+                continue
+            word, freq = line.strip().split("\t")
+            if int(freq) >= min_count:
+                vocab.add(word)
+    return vocab
+
 def check_k_exmaple_from_tensor(example_lst, y_pred_tensor, y_true_tensor, k_example=20):
     ### Convert to python ###
     # Python list    

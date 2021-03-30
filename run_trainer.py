@@ -5,8 +5,9 @@ import logging
 import json
 import pathlib
 import sys
-from functools import partial
+import pickle
 import numpy as np
+from functools import partial
 
 import captum
 import spacy
@@ -29,18 +30,12 @@ from datasets import ClassLabel, load_dataset, load_metric
 from models.rnn import LSTMEncoder,CustomLSTM
 
 from models.transformer import Transformer
-from models.utils import create_transformer_masks, init_weights, prepare_discriminator_data,convert_tensor_to_tokens,save_k_exmaple_from_tensor,check_k_exmaple_from_tensor
+from models.utils import create_transformer_masks, init_weights, prepare_discriminator_data,convert_tensor_to_tokens,save_k_exmaple_from_tensor,check_k_exmaple_from_tensor, build_vocab
 from models.transformer_blocks import WarmupScheduler
 
 cuda_is_available = torch.cuda.is_available()
 device = torch.device("cuda:0" if cuda_is_available else "cpu")
-
-
-class LangugageGAN:
-    def __init__(self, generator, discriminator):
-        self.generator = generator
-        self.discriminator = discriminator
-
+ 
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -100,23 +95,6 @@ def get_args():
     
     return parser.parse_args()
 
-
-def build_vocab(vocab_file, min_count=0):
-    """Build vocabulary from file.
-
-    Args:
-      vocab_file: path  
-    """
-    vocab = set()
-    with open(vocab_file, "r") as f:
-        for line in f:
-            if line == "\n":
-                continue
-
-            word, freq = line.strip().split("\t")
-            if int(freq) >= min_count:
-                vocab.add(word)
-    return vocab
 
 def train_generator_MLE(generator, 
                         dataset,
@@ -475,10 +453,19 @@ def main():
     vocab = build_vocab(args.vocab)
     vocab.update(["[CLS]", "[UNK]", "[SEP]", "[PAD]"])
     vocab.update(condition_list) # Add conditions words to vocab
+    vocab_lst = list(vocab)
 
-    tok2id = {w: idx for idx, w in enumerate(vocab)}
+    ## write vocab file ###
+    wf = get_output_dir(args.output_dir, "vocab.train")
+    with open(wf, "w") as f:
+        f.write('\n'.join(vocab_lst))
+    ### write vocab file ##
+
+    tok2id = {w: idx for idx, w in enumerate(vocab_lst)}
     id2tok = {v: k for k, v in tok2id.items()}
 
+    for i in range(10):
+        print(i, id2tok[i])
     vocab_size = len(vocab)
     UNK_IDX = tok2id["[UNK]"]
     PAD_IDX = tok2id["[PAD]"]
@@ -578,6 +565,7 @@ def main():
 
         return feature_dict
 
+
     tokenize_fn = partial(tokenize_fn, max_seq_len=args.max_seq_length)
 
     ### Truncate  number of examples ###
@@ -644,7 +632,6 @@ def main():
 
         return features_dict
 
-    
     # Construct generator
     generator = Transformer(num_layers=args.tf_layers,
                             d_model=args.tf_dims,
@@ -661,7 +648,6 @@ def main():
         generator.cuda()
     #generator.apply(init_weights)
     logging.info(generator.encoder)
-
 
     out = torch.tensor([1,0,1,1])
     tar = torch.tensor([0,0,1,1])
