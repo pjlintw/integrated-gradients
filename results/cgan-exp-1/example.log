@@ -1,0 +1,60 @@
+10:02:42, 857 __main__ INFO Namespace(batch_size=48, dataset_script='wiki-table-questions.py', do_eval=True, do_predict=True, do_train=True, eval_steps=10, gpu=True, logging_first_step='True', logging_steps=10, max_seq_length=20, max_steps=50, max_test_samples=200, max_train_samples=None, max_val_samples=200, mle_epochs=3, model_name_or_path='textgan', output_dir='results/cgan-exp-1', rnn_bidirectional=False, rnn_classes=1, rnn_dims=256, rnn_dropout_rate=0.1, rnn_embedding_dims=256, rnn_layers=1, tf_dims=512, tf_dropout_rate=0.1, tf_embedding_dims=256, tf_heads=8, tf_layers=2, tf_learning_rate=0.01, tf_shared_emb_layer=False, train_discriminator_epochs=1, vocab='data/wikiTable/word.vocab')
+10:02:42, 858 __main__ INFO Saving hyperparameters to: results/cgan-exp-1/hyparams.txt
+10:02:42, 866 datasets.builder WARNING Reusing dataset wiki_table_questions (/home/CE/pinjie/.cache/huggingface/datasets/wiki_table_questions/WikiTableQuestions/0.0.0/6a4116117d81a3d888218d55619bdb3ba81a1942ee880bf11b7f64a30e2f8e1a)
+10:02:42, 879 __main__ INFO Loading Datasets
+10:02:42, 890 root INFO PAD_IDX: 7587
+10:02:55, 28 root INFO TransformerEncoder(
+  (enc_layers): ModuleList(
+    (0): TransformerEncLayer(
+      (mha): MultiHeadAttention(
+        (w_q): Linear(in_features=512, out_features=512, bias=True)
+        (w_k): Linear(in_features=512, out_features=512, bias=True)
+        (w_v): Linear(in_features=512, out_features=512, bias=True)
+      )
+      (ffn): FeedForwardBlock(
+        (dense1): Linear(in_features=512, out_features=2048, bias=True)
+        (relu): ReLU()
+        (dense2): Linear(in_features=2048, out_features=512, bias=True)
+      )
+      (layernorm1): LayerNorm((512,), eps=1e-06, elementwise_affine=True)
+      (layernorm2): LayerNorm((512,), eps=1e-06, elementwise_affine=True)
+      (dropout1): Dropout(p=0.1, inplace=False)
+      (dropout2): Dropout(p=0.1, inplace=False)
+    )
+    (1): TransformerEncLayer(
+      (mha): MultiHeadAttention(
+        (w_q): Linear(in_features=512, out_features=512, bias=True)
+        (w_k): Linear(in_features=512, out_features=512, bias=True)
+        (w_v): Linear(in_features=512, out_features=512, bias=True)
+      )
+      (ffn): FeedForwardBlock(
+        (dense1): Linear(in_features=512, out_features=2048, bias=True)
+        (relu): ReLU()
+        (dense2): Linear(in_features=2048, out_features=512, bias=True)
+      )
+      (layernorm1): LayerNorm((512,), eps=1e-06, elementwise_affine=True)
+      (layernorm2): LayerNorm((512,), eps=1e-06, elementwise_affine=True)
+      (dropout1): Dropout(p=0.1, inplace=False)
+      (dropout2): Dropout(p=0.1, inplace=False)
+    )
+  )
+  (dropout): Dropout(p=0.1, inplace=False)
+)
+10:02:55, 175 root INFO CustomLSTM(
+  (embedding): Embedding(11471, 300)
+  (lstm): LSTM(300, 128, batch_first=True, bidirectional=True)
+  (drop): Dropout(p=0.5, inplace=False)
+  (fc): Linear(in_features=256, out_features=1, bias=True)
+)
+10:02:58, 859 root INFO Step: 50, Loss: 7.58
+10:03:03, 135 root INFO Step: 100, Loss: 5.99
+10:03:07, 535 root INFO Step: 150, Loss: 5.46
+10:03:11, 735 root INFO Step: 200, Loss: 4.55
+10:03:18, 660 root INFO Step: 50, Loss: 4.23
+10:03:20, 571 root INFO Step: 100, Loss: 4.17
+10:03:22, 445 root INFO Step: 150, Loss: 3.90
+10:03:25, 445 root INFO Step: 200, Loss: 3.80
+10:03:33, 80 root INFO Step: 50, Loss: 3.68
+10:03:36, 523 root INFO Step: 100, Loss: 3.45
+10:03:38, 888 root INFO Step: 150, Loss: 3.62
+10:03:43, 65 root INFO Step: 200, Loss: 3.47
