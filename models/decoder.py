@@ -74,13 +74,19 @@ class TransformerDecoder(nn.Module):
         self.dropout = nn.Dropout(p=rate)
 
 
-    def forward(self, x, enc_output, training, look_ahead_mask, padding_mask):
+    def forward(self, x, enc_output, training, look_ahead_mask, padding_mask, gpu=False):
         seq_len = x.shape[1]
         attention_weights = dict()
 
+        if gpu:
+            x=x.cuda()
         x = self.embedding(x)
         x = torch.mul(x, (self.d_model**(1/2)))
-        x += self.pos_encoding[:, :seq_len, :] #.cuda()
+
+        if gpu:
+            x += self.pos_encoding[:, :seq_len, :].cuda()
+        else:
+            x += self.pos_encoding[:, :seq_len, :]
     
         if training is True:
             x = self.dropout(x)

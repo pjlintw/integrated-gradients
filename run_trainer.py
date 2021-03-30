@@ -1,6 +1,5 @@
 """Train conditional text GANs with trainer."""
 import os
-
 import argparse
 import logging
 import json
@@ -89,8 +88,8 @@ def get_args():
 
     parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--mle_epochs', type=int, default=3)
-    parser.add_argument('--train_discriminator_epochs', type=int, default=3)
-    parser.add_argument('--max_steps', type=int, default=10000)
+    parser.add_argument('--train_discriminator_epochs', type=int, default=1)
+    parser.add_argument('--max_steps', type=int, default=50)
     parser.add_argument('--max_train_samples', type=int)
     parser.add_argument('--max_val_samples', type=int)
     parser.add_argument('--max_test_samples', type=int)
@@ -121,13 +120,13 @@ def build_vocab(vocab_file, min_count=0):
                 vocab.add(word)
     return vocab
 
-
 def train_generator_MLE(generator, 
                         dataset,
                         opt, 
                         logging_steps=50, 
                         epochs=1,
-                        tokenizer_dict=None):
+                        tokenizer_dict=None,
+                        args=None):
     """Pre-train the generator with MLE."""
     # Prepare for `decode_batch`
     vocab_size = tokenizer_dict["vocab_size"] 
@@ -159,13 +158,14 @@ def train_generator_MLE(generator,
             gen_inp = batch_token_ids[:, :-1] #.cuda()
             gen_target = batch_token_ids[:, 1:] #.cuda()
 
-            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels, gen_inp, pad_idx)
+            enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(batch_labels, gen_inp, pad_idx, gpu=args.gpu)
             output, attn = generator(batch_labels,
                                      gen_inp,
                                      training=False,
                                      enc_padding_mask=enc_padding_mask,
                                      look_ahead_mask=combined_mask,
-                                     dec_padding_mask=dec_padding_mask)
+                                     dec_padding_mask=dec_padding_mask,
+                                     cuda=args.gpu)
             
             # (batch_size*(seq_len-1), vocab_size)
             viewed_output = output.view(-1, vocab_size)
@@ -238,39 +238,42 @@ def train_discriminator(generator,
             ###############
             # Batch preparation
             ###############
+            batch_size = features_dict["batch_token_ids"].shape[0] 
+            half_batch = int(batch_size/2)
+            
             # G(c)
-            batch_labels = features_dict["batch_labels"]
-            batch_lengths = features_dict["batch_lengths"]
+            batch_labels = features_dict["batch_labels"][:half_batch]
+            batch_lengths = features_dict["batch_lengths"][:half_batch]
+  
             #print("type batch length", batch_lengths)
             # D(x)
-            batch_token_ids = features_dict["batch_token_ids"]            
+            batch_token_ids = features_dict["batch_token_ids"][:half_batch,:]
             # D(c, x)
-            batch_pos_condition_ids = features_dict["batch_pos_condition_ids"]
-            batch_neg_condition_ids = features_dict["batch_neg_condition_ids"]
+            batch_pos_condition_ids = features_dict["batch_pos_condition_ids"][:half_batch,:]
+            batch_neg_condition_ids = features_dict["batch_neg_condition_ids"][:half_batch,:]
 
-            #dis_pair_tar = dis_pair_tar.unsqueeze(1)
-            batch_size = batch_token_ids.shape[0]
             # To 2D tensor
-            batch_labels = batch_labels.unsqueeze(1) #.cuda()    
+            batch_labels = batch_labels.unsqueeze(1)
             # Sample a batch of sequences from generator 
-            fake_seq_target = torch.zeros(batch_size, 1)
+            fake_seq_target = torch.zeros(half_batch, 1)
         
             ######################
             # Generator 
             ######################
             # (batch_size, max_seq_len)
             fake_seq = generator.sample(inp=batch_labels,
-                                        max_len=20,
+                                        max_len=args.max_seq_length,
                                         temperature=0.3,
                                         training=False,
                                         sos_idx=tok2id["[CLS]"],
-                                        eos_idx=tok2id["[SEP]"])
+                                        eos_idx=tok2id["[SEP]"],
+                                        cuda=args.gpu)
 
             dis_seq_inp, dis_seq_tar, seq_lengths = prepare_discriminator_data(pos_samples=batch_token_ids, 
                                                                                neg_samples=fake_seq,
                                                                                pos_lengths=batch_lengths,
-                                                                               neg_lengths=batch_lengths)
-
+                                                                               neg_lengths=batch_lengths,
+                                                                               gpu=args.gpu)
             ##############################
             # Discriminator: perform D(x)
             ##############################
@@ -305,7 +308,8 @@ def train_discriminator(generator,
             dis_pair_inp, dis_pair_tar, dis_pair_lengths = prepare_discriminator_data(pos_samples=batch_pos_condition_ids, 
                                                                                       neg_samples=batch_neg_condition_ids,
                                                                                       pos_lengths=batch_lengths,
-                                                                                      neg_lengths=batch_lengths)
+                                                                                      neg_lengths=batch_lengths,
+                                                                                      gpu=args.gpu)
             
             #pair_logits, pair_pred = match_network(dis_pair_inp, lengths=dis_pair_lengths, mode="matching")
             pair_pred = match_network(dis_pair_inp, dis_pair_lengths)
@@ -346,8 +350,11 @@ def train_discriminator(generator,
                 avg_match_loss = matching_loss.data.item() / batch_size
                 avg_match_acc = matching_acc.data.item() / batch_size
 
-                print(f'Classifcation Loss: {classifcation_loss:.2f}, Avg loss: {avg_cls_loss:.2f}, Avg accuracy {avg_cls_acc:.2f}') 
-                print(f'Matching Loss: {matching_loss:.2f}, Avg loss: {avg_match_loss:.2f}, Avg accuracy {avg_match_acc:.2f}') 
+                print(f'Step: {step+1}, Classifcation Loss: {classifcation_loss:.2f}, Avg loss: {avg_cls_loss:.2f}, Avg accuracy {avg_cls_acc:.2f}') 
+                print(f'Step: {step+1}, Matching Loss: {matching_loss:.2f}, Avg loss: {avg_match_loss:.2f}, Avg accuracy {avg_match_acc:.2f}') 
+            if step+1 == args.max_steps:
+                break
+                sys.stdout.flush()
         ### Convert to python ###
         # Python list    
         k_example = 20
@@ -399,6 +406,7 @@ def main():
     args = get_args()
     SEED = 49
 
+    args.gpu = cuda_is_available
     # Create output dir
     output_dir = args.output_dir
 
@@ -593,7 +601,7 @@ def main():
 
     ### Feature
     # `token_ids`, `labels` for training and loss computation
-    def generate_batch(data_batch):
+    def generate_batch(data_batch, gpu):
         """Package feature as mini-batch."""
         features_dict = dict()
         batch_token_ids, batch_labels = list(), list()
@@ -604,7 +612,6 @@ def main():
     
         #print("len batch", len(data_batch))
         for batch_group in data_batch:
-
             batch_token_ids.append(batch_group["token_ids"])
             batch_labels.append(batch_group["label"])
             batch_lengths.append(batch_group["padded_length"])
@@ -616,6 +623,13 @@ def main():
         features_dict["batch_lengths"]= torch.tensor(batch_lengths)
         features_dict["batch_pos_condition_ids"] = torch.tensor(batch_pos_condition_ids)
         features_dict["batch_neg_condition_ids"] = torch.tensor(batch_neg_condition_ids)
+
+        if gpu:
+            features_dict["batch_token_ids"] = features_dict["batch_token_ids"].cuda()
+            features_dict["batch_labels"]= features_dict["batch_labels"].cuda()
+            features_dict["batch_pos_condition_ids"] = features_dict["batch_pos_condition_ids"].cuda() 
+            features_dict["batch_neg_condition_ids"] = features_dict["batch_neg_condition_ids"].cuda()
+
         return features_dict
 
     
@@ -672,14 +686,15 @@ def main():
         discriminator.cuda()
         match_network.cuda()
     logging.info(discriminator)
-    
+
+    generate_batch_fn = partial(generate_batch, gpu=args.gpu)
     ### Fetch dataset iterator
     train_iter = DataLoader(train_dataset, batch_size=args.batch_size,
-                           shuffle=True, collate_fn=generate_batch)
+                           shuffle=True, collate_fn=generate_batch_fn)
     eval_iter = DataLoader(eval_dataset, batch_size=args.batch_size,
-                           shuffle=True, collate_fn=generate_batch)
+                           shuffle=True, collate_fn=generate_batch_fn)
     test_iter = DataLoader(test_dataset, batch_size=args.batch_size,
-                           shuffle=True, collate_fn=generate_batch)
+                           shuffle=True, collate_fn=generate_batch_fn)
 
     ### Pre-train generator ###
     print("Pre-train the generator")
@@ -689,12 +704,13 @@ def main():
                                     warmup=4000,
                                     optimizer=gen_optimizer)
     
-    # train_generator_MLE(generator=generator,
-    #                     dataset=train_iter,
-    #                     opt=gen_optimizer,
-    #                     logging_steps=50, 
-    #                     epochs=args.mle_epochs,
-    #                     tokenizer_dict=tokenizer_collector)
+    train_generator_MLE(generator=generator,
+                         dataset=train_iter,
+                         opt=gen_optimizer,
+                         logging_steps=50, 
+                         epochs=args.mle_epochs,
+                         tokenizer_dict=tokenizer_collector,
+                         args=args)
     
     ### Pre-train generator ###
     print("Pre-train discriminator")
@@ -707,7 +723,7 @@ def main():
                         opt_dis=dis_optimizer,
                         opt_match=match_optimizer, 
                         logging_steps=args.logging_steps,
-                        epochs=1, # args.train_discriminator_epochs
+                        epochs=args.train_discriminator_epochs,
                         tokenizer_dict=tokenizer_collector,
                         args=args)
     
