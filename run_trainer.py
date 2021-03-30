@@ -293,8 +293,8 @@ def train_discriminator(generator,
             seq_pred = seq_pred.squeeze() # To 1D-tensor
             
 
-            print(dis_seq_tar[:10])
-            print(seq_pred[:10])
+            #print(dis_seq_tar[:10])
+            #print(seq_pred[:10])
             # Check
             # k_example = 10
             # seq_tokens_list = convert_tensor_to_tokens(dis_seq_inp, tok2id, id2tok, first_k_example=k_example)
