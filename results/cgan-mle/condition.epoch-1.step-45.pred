@@ -1,0 +1,20 @@
+1.0	0.99	[which] [CLS] which one is the last on the chart [SEP]
+1.0	0.99	[which] [CLS] which locomotive builder built a locomotive after 1888 and built the locomotive as a 2ft gauge locomotiv ?
+0.0	0.02	[where] [CLS] what number of the athletes are from spai ? [SEP]
+0.0	0.02	[who] [CLS] how many treaties had been introduced by 198 ? [SEP]
+0.0	0.00	[where] [CLS] how many total laps did alex figge complet ? [SEP]
+1.0	1.00	[how] [CLS] how many consecutive wins took place in octobe ? [SEP]
+1.0	1.00	[how] [CLS] how many consecutive floor exercise gold medals did romanian star andreea raducan win at the world championship ?
+0.0	0.02	[where] [CLS] what country won more gold medals than any othe ? [SEP]
+0.0	0.00	[when] [CLS] what team was silvestre varela a member of before moving to port ? [SEP]
+0.0	0.00	[why] [CLS] how many consecutive wins took place in octobe ? [SEP]
+1.0	0.98	[what] [CLS] what is the name of the team listed before burnle ? [SEP]
+1.0	1.00	[how] [CLS] how many times in total did ikangaa run the marathon in the olympic game ? [SEP]
+0.0	0.16	[how] [CLS] which national park has the least visitatio ? [SEP]
+1.0	0.53	[what] [CLS] since 1983 what country has won the most (combined men & women ? [SEP]
+1.0	0.99	[how] [CLS] how many treaties had been introduced by 198 ? [SEP]
+1.0	0.98	[what] [CLS] what team was silvestre varela a member of before moving to port ? [SEP]
+1.0	1.00	[how] [CLS] how many consecutive year did the grand total value grow in ira ? [SEP]
+0.0	0.00	[whose] [CLS] how many consecutive floor exercise gold medals did romanian star andreea raducan win at the world championship ?
+1.0	0.99	[how] [CLS] how many countries received silver medal ? [SEP]
+0.0	0.00	[whose] [CLS] since 1983 what country has won the most (combined men & women ? [SEP]

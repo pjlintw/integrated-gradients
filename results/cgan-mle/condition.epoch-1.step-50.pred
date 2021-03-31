@@ -1,0 +1,20 @@
+1.0	0.99	[what] [CLS] what is the number of roles that this actor had in the movie hadh kar di aapn ?
+1.0	0.99	[who] [CLS] who was the only driver to win in a car other than a subaru impreza after the year
+1.0	1.00	[how] [CLS] how many subjects are ther ? [SEP]
+0.0	0.00	[why] [CLS] how many of these parties currently have no councillor ? [SEP]
+1.0	1.00	[how] [CLS] how many of these parties currently have no councillor ? [SEP]
+1.0	1.00	[what] [CLS] what was the venue before dakar, senega ? [SEP]
+0.0	0.00	[where] [CLS] what was the venue before dakar, senega ? [SEP]
+0.0	0.02	[which] [CLS] what was the first year that the romanian population was less than 51,00 ? [SEP]
+1.0	1.00	[what] [CLS] what is the area (in acres) of the last table entr ? [SEP]
+1.0	0.98	[what] [CLS] what operational date is next to zuse z ? [SEP]
+0.0	0.08	[when] [CLS] who was the only driver to win in a car other than a subaru impreza after the year
+1.0	0.99	[what] [CLS] what was the score for borussia dortmun ? [SEP]
+1.0	0.99	[which] [CLS] which year had at most a time of 9.7 ? [SEP]
+0.0	0.00	[when] [CLS] how many teams had at least 15 win ? [SEP]
+0.0	0.00	[who] [CLS] what was the first live album that was released in 201 ? [SEP]
+0.0	0.01	[what] [CLS] which album came after hammer and tongs for this grou ? [SEP]
+1.0	1.00	[how] [CLS] how many skaters have at most 2600 point ? [SEP]
+0.0	0.08	[when] [CLS] which year saw the largest population of tower division during this tim ? [SEP]
+1.0	0.99	[which] [CLS] which model of car won the most races in the 1992 seaso ? [SEP]
+1.0	1.00	[how] [CLS] how many games were played after 200 ? [SEP]
