@@ -1,4 +1,4 @@
-name: integrated-gradients
+name: integrated-gradients-cgan
 
 dependencies:
   - python=3.8
