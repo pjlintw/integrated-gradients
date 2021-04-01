@@ -170,8 +170,7 @@ def train_generator_MLE(generator,
             # print("token1", decode_batch(gen_inp, id2tok, unk_idx)[0])
             # print("token1", decode_batch(gen_target, id2tok, unk_idx)[0])
         pred_sentences = decode_batch(gen_inp, id2tok, unk_idx)
-        #print("Done", "", pred_sentences[0])
-        #print(pred_sentences[1])
+        
     return None
 
 
@@ -705,20 +704,7 @@ def main():
                         epochs=args.train_discriminator_epochs,
                         tokenizer_dict=tokenizer_collector,
                         args=args)
-    
-    ### Training ###
-    # Initialize our adversarial Trainer
-    # trainer = Trainer(
-    #     generator=generator,
-    #     discriminator=discriminator,
-    #     args=training_args,
-    #     train_dataset=train_dataset if training_args.do_train else None,
-    #     eval_dataset=eval_dataset if training_args.do_eval else None,
-    #     tokenizer=tokenizer,
-    #     data_collator=data_collator,
-    #     compute_metrics=compute_metrics,
-    # )
-    
+
 
 if __name__ == "__main__":
     main()
