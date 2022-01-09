@@ -92,7 +92,7 @@ def get_args():
     parser.add_argument('--logging_first_step', default=True, required=False)
     parser.add_argument('--logging_steps', type=int, default=10)
     parser.add_argument('--eval_steps', type=int, default=500)
-    
+    parser.add_argument('--gpu_no', type=int, default=0)    
     return parser.parse_args()
 
 
@@ -273,11 +273,11 @@ def train_discriminator(generator,
         
 
             ### Adversarial Training ###
-            generator_loss =  loss_gen_fn(seq_pred, dis_seq_tar)
+            #generator_loss =  loss_gen_fn(seq_pred, dis_seq_tar)
             
-            (-generator_loss).backward(retain_graph=True)       
-            print("generator_loss", -generator_loss.data)
-            opt_gen.step()
+            # (-generator_loss).backward(retain_graph=True)       
+            # print("generator_loss", -generator_loss.data.item())
+            # opt_gen.step()
             ### Adversarial Training ###
 
             # Check
@@ -353,7 +353,7 @@ def train_discriminator(generator,
                 # Save model
                 pt_file_dis = get_output_dir(args.output_dir, f"ckpt/dis.epoch-{epoch+1}.step-{step+1}.pt")
                 pt_file_match = get_output_dir(args.output_dir, f"ckpt/match.epoch-{epoch+1}.step-{step+1}.pt")
-                torch.save(discriminator.state_dict(), pt_file_dis)
+                torch.save(discriminator, pt_file_dis)
                 torch.save(match_network, pt_file_match)
             if step+1 == args.max_steps:
                 break
@@ -609,7 +609,6 @@ def main():
         batch_pos_condition_ids = list()
         batch_neg_condition_ids = list()
 
-    
         #print("len batch", len(data_batch))
         for batch_group in data_batch:
             batch_token_ids.append(batch_group["token_ids"])
@@ -644,8 +643,18 @@ def main():
                             padding_idx=PAD_IDX,
                             shared_emb_layer=args.tf_shared_emb_layer, # Whether use embeeding layer from encoder
                             rate=args.tf_dropout_rate)
+
+    discriminator = CustomLSTM(vocab_size=vocab_size)
+    match_network = CustomLSTM(vocab_size=vocab_size)
+
     if cuda_is_available:
-        generator.cuda()
+        generator.to(device)
+        discriminator.to(device)
+        match_network.to(device)
+
+    
+    # if cuda_is_available:
+    #    generator.cuda()
     #generator.apply(init_weights)
     logging.info(generator.encoder)
 
@@ -654,14 +663,12 @@ def main():
     batch_size = tar.shape[0]
     #print(torch.sum((out>0.5)==(tar>0.5)).data/batch_size)
 
-
-    discriminator = CustomLSTM(vocab_size=vocab_size)
-    match_network = CustomLSTM(vocab_size=vocab_size)
-
+    # discriminator = CustomLSTM(vocab_size=vocab_size)
+    # match_network = CustomLSTM(vocab_size=vocab_size)
     
-    if cuda_is_available:
-        discriminator.cuda()
-        match_network.cuda()
+    # if cuda_is_available:
+    #     discriminator.cuda()
+    #     match_network.cuda()
     logging.info(discriminator)
 
     generate_batch_fn = partial(generate_batch, gpu=args.gpu)

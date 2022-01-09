@@ -51,8 +51,9 @@ def positional_encoding(position, dim):
     # angle_rads = get_angles(np.arange(position)[:, np.newaxis],
     #                       np.arange(dim)[np.newaxis, :],
     #                       dim)
+    # Created in CPU by default
     angle_rads = get_angles(torch.arange(position).unsqueeze_(1),
-                            torch.arange(dim).unsqueeze_(0),
+                                torch.arange(dim).unsqueeze_(0),
                             dim)    
     # apply sin to even indices in the array; 2i
     angle_rads[:, 0::2] = torch.sin(angle_rads[:, 0::2])
