@@ -1,5 +1,0 @@
-12:29:27, 591 __main__ INFO Namespace(batch_size=48, dataset_script='wiki-table-questions.py', do_eval=True, do_predict=True, do_train=True, eval_steps=10, gpu=True, logging_first_step='True', logging_steps=5, max_seq_length=20, max_steps=30, max_test_samples=200, max_train_samples=None, max_val_samples=200, mle_epochs=3, model_name_or_path='textgan', output_dir='results/cgan-exp-1', rnn_bidirectional=False, rnn_classes=1, rnn_dims=256, rnn_dropout_rate=0.1, rnn_embedding_dims=256, rnn_layers=1, tf_dims=512, tf_dropout_rate=0.1, tf_embedding_dims=256, tf_heads=8, tf_layers=2, tf_learning_rate=0.01, tf_shared_emb_layer=False, train_discriminator_epochs=1, vocab='data/wikiTable/word.vocab')
-12:29:27, 591 __main__ INFO Saving hyperparameters to: results/cgan-exp-1/hyparams.txt
-12:29:27, 599 datasets.builder WARNING Reusing dataset wiki_table_questions (/home/CE/pinjie/.cache/huggingface/datasets/wiki_table_questions/WikiTableQuestions/0.0.0/6a4116117d81a3d888218d55619bdb3ba81a1942ee880bf11b7f64a30e2f8e1a)
-12:29:27, 612 __main__ INFO Loading Datasets
-12:29:27, 629 root INFO PAD_IDX: 8829

@@ -59,8 +59,8 @@ class Transformer(nn.Module):
         # (batch_size, inp_seq_len, d_model)
         enc_out = self.encoder(src, training, enc_padding_mask, gpu=cuda) #.cuda()
 
-        if cuda:
-            enc_out = enc_out.cuda()
+        # if cuda:
+        #     enc_out = enc_out.cuda()
         # print("type of decoder input", type(tgt))
         # print("decoder input", tgt)
         # (batch_size, tgt_seq_len, d_model)
@@ -94,21 +94,20 @@ class Transformer(nn.Module):
         else:
             inp = torch.tensor(inp)
 
-        if cuda:
-            inp = inp.cuda()
+        #if cuda:
+        #    inp = inp.cuda()
 
         # Gumbel-Softmax tricks
         batch_size = inp.shape[0]
         #sampled_ids = torch.zeros(batch_size, max_len).type(torch.LongTensor)
 
         # (batch_size, 1)
+        # Create a tensor on CPU by default
         output = torch.tensor([sos_idx]*batch_size).unsqueeze(1)
-        
-        assert output.shape[-1] == 1 
-
         if cuda:
-            output = output.cuda()
-
+            output=output.cuda()
+        assert output.shape[-1] == 1 
+        
         for i in range(max_len-1):
             # enc_pad_mask, combined_mask, dec_pad_mask
             enc_padding_mask, combined_mask, dec_padding_mask = create_transformer_masks(inp, output, self.pad_idx,gpu=cuda)
@@ -120,6 +119,7 @@ class Transformer(nn.Module):
                                           combined_mask,
                                           dec_padding_mask,
                                           cuda=cuda)
+            
             
             # Select the last word from the seq_len dimension
             # (batch_size, 1, vocab_size) to (batch_size, voacb_size) 
@@ -145,9 +145,12 @@ class Transformer(nn.Module):
 
     
 
-def sample_gumbel(shape, eps=1e-20):
+def sample_gumbel(shape, eps=1e-20, device=None):
     """Sample from Gumbel(0, 1)"""
-    noise = torch.rand(shape)
+    if device:
+        device="cuda"
+    # The drawn nosie is created by default in CPU
+    noise = torch.rand(shape, device=device)
     return -torch.log(-torch.log(noise+eps)+eps)
 
 
@@ -157,10 +160,7 @@ def gumbel_softmax_sample(logits, temperature, gpu):
         1. Gumbel distribution: https://en.wikipedia.org/wiki/Gumbel_distribution
         2. Inverse Tranform Sampling: https://en.wikipedia.org/wiki/Inverse_transform_sampling
     """
-    if gpu:
-        y = logits + sample_gumbel(logits.shape).cuda()
-    else:
-        y = logits + sample_gumbel(logits.shape)
+    y = logits + sample_gumbel(shape=logits.shape, device=gpu)
     return nn.functional.softmax(y/temperature, dim=-1)
 
 

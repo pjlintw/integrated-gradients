@@ -5,8 +5,9 @@ import logging
 import json
 import pathlib
 import sys
-from functools import partial
+import pickle
 import numpy as np
+from functools import partial
 
 import captum
 import spacy
@@ -29,10 +30,11 @@ from datasets import ClassLabel, load_dataset, load_metric
 from models.rnn import LSTMEncoder,CustomLSTM
 
 from models.transformer import Transformer
-from models.utils import create_transformer_masks, init_weights, prepare_discriminator_data,convert_tensor_to_tokens,save_k_exmaple_from_tensor,check_k_exmaple_from_tensor
+from models.utils import create_transformer_masks, init_weights, prepare_discriminator_data,convert_tensor_to_tokens,save_k_exmaple_from_tensor,check_k_exmaple_from_tensor, build_vocab
 from models.transformer_blocks import WarmupScheduler
 
 cuda_is_available = torch.cuda.is_available()
+
 device = torch.device("cuda:6" if cuda_is_available else "cpu")
 
 class LangugageGAN:
@@ -96,26 +98,9 @@ def get_args():
     parser.add_argument('--logging_first_step', default=True, required=False)
     parser.add_argument('--logging_steps', type=int, default=10)
     parser.add_argument('--eval_steps', type=int, default=500)
-    
+    parser.add_argument('--gpu_no', type=int, default=0)    
     return parser.parse_args()
 
-
-def build_vocab(vocab_file, min_count=0):
-    """Build vocabulary from file.
-
-    Args:
-      vocab_file: path  
-    """
-    vocab = set()
-    with open(vocab_file, "r") as f:
-        for line in f:
-            if line == "\n":
-                continue
-
-            word, freq = line.strip().split("\t")
-            if int(freq) >= min_count:
-                vocab.add(word)
-    return vocab
 
 def train_generator_MLE(generator, 
                         dataset,
@@ -177,11 +162,9 @@ def train_generator_MLE(generator,
             opt.step()
 
             if (step+1) % logging_steps == 0:
-                msg = f"Step: {step+1}, Loss: {loss.item():.2f}"
+                msg = f"Model: generator, Step: {step+1}, Loss: {loss.item():.2f}"
                 logging.info(msg)
                 print(msg)
-
-            break
 
             # NLLLoss(inp, target)
             # inp: (batch)
@@ -193,8 +176,7 @@ def train_generator_MLE(generator,
             # print("token1", decode_batch(gen_inp, id2tok, unk_idx)[0])
             # print("token1", decode_batch(gen_target, id2tok, unk_idx)[0])
         pred_sentences = decode_batch(gen_inp, id2tok, unk_idx)
-        print("Done", "", pred_sentences[0])
-        print(pred_sentences[1])
+        
     return None
 
 
@@ -298,9 +280,9 @@ def train_discriminator(generator,
             ### Adversarial Training ###
             #generator_loss =  loss_gen_fn(seq_pred, dis_seq_tar)
             
-            #(-generator_loss).backward(retain_graph=True)       
-            #print("generator_loss", -generator_loss)
-            #opt_gen.step()
+            # (-generator_loss).backward(retain_graph=True)       
+            # print("generator_loss", -generator_loss.data.item())
+            # opt_gen.step()
             ### Adversarial Training ###
 
             # Check
@@ -376,7 +358,7 @@ def train_discriminator(generator,
                 # Save model
                 pt_file_dis = get_output_dir(args.output_dir, f"ckpt/dis.epoch-{epoch+1}.step-{step+1}.pt")
                 pt_file_match = get_output_dir(args.output_dir, f"ckpt/match.epoch-{epoch+1}.step-{step+1}.pt")
-                torch.save(discriminator.state_dict(), pt_file_dis)
+                torch.save(discriminator, pt_file_dis)
                 torch.save(match_network, pt_file_match)
             if step+1 == args.max_steps:
                 break
@@ -476,10 +458,19 @@ def main():
     vocab = build_vocab(args.vocab)
     vocab.update(["[CLS]", "[UNK]", "[SEP]", "[PAD]"])
     vocab.update(condition_list) # Add conditions words to vocab
+    vocab_lst = list(vocab)
 
-    tok2id = {w: idx for idx, w in enumerate(vocab)}
+    ## write vocab file ###
+    wf = get_output_dir(args.output_dir, "vocab.train")
+    with open(wf, "w") as f:
+        f.write('\n'.join(vocab_lst))
+    ### write vocab file ##
+
+    tok2id = {w: idx for idx, w in enumerate(vocab_lst)}
     id2tok = {v: k for k, v in tok2id.items()}
 
+    for i in range(10):
+        print(i, id2tok[i])
     vocab_size = len(vocab)
     UNK_IDX = tok2id["[UNK]"]
     PAD_IDX = tok2id["[PAD]"]
@@ -579,6 +570,7 @@ def main():
 
         return feature_dict
 
+
     tokenize_fn = partial(tokenize_fn, max_seq_len=args.max_seq_length)
 
     ### Truncate  number of examples ###
@@ -622,7 +614,6 @@ def main():
         batch_pos_condition_ids = list()
         batch_neg_condition_ids = list()
 
-    
         #print("len batch", len(data_batch))
         for batch_group in data_batch:
             batch_token_ids.append(batch_group["token_ids"])
@@ -645,7 +636,6 @@ def main():
 
         return features_dict
 
-    
     # Construct generator
     generator = Transformer(num_layers=args.tf_layers,
                             d_model=args.tf_dims,
@@ -658,25 +648,32 @@ def main():
                             padding_idx=PAD_IDX,
                             shared_emb_layer=args.tf_shared_emb_layer, # Whether use embeeding layer from encoder
                             rate=args.tf_dropout_rate)
+
+    discriminator = CustomLSTM(vocab_size=vocab_size)
+    match_network = CustomLSTM(vocab_size=vocab_size)
+
     if cuda_is_available:
-        generator.cuda()
+        generator.to(device)
+        discriminator.to(device)
+        match_network.to(device)
+
+    
+    # if cuda_is_available:
+    #    generator.cuda()
     #generator.apply(init_weights)
     logging.info(generator.encoder)
-
 
     out = torch.tensor([1,0,1,1])
     tar = torch.tensor([0,0,1,1])
     batch_size = tar.shape[0]
     #print(torch.sum((out>0.5)==(tar>0.5)).data/batch_size)
 
-
-    discriminator = CustomLSTM(vocab_size=vocab_size)
-    match_network = CustomLSTM(vocab_size=vocab_size)
-
+    # discriminator = CustomLSTM(vocab_size=vocab_size)
+    # match_network = CustomLSTM(vocab_size=vocab_size)
     
-    if cuda_is_available:
-        discriminator.cuda()
-        match_network.cuda()
+    # if cuda_is_available:
+    #     discriminator.cuda()
+    #     match_network.cuda()
     logging.info(discriminator)
 
     generate_batch_fn = partial(generate_batch, gpu=args.gpu)
@@ -720,20 +717,7 @@ def main():
                         epochs=args.train_discriminator_epochs,
                         tokenizer_dict=tokenizer_collector,
                         args=args)
-    
-    ### Training ###
-    # Initialize our adversarial Trainer
-    # trainer = Trainer(
-    #     generator=generator,
-    #     discriminator=discriminator,
-    #     args=training_args,
-    #     train_dataset=train_dataset if training_args.do_train else None,
-    #     eval_dataset=eval_dataset if training_args.do_eval else None,
-    #     tokenizer=tokenizer,
-    #     data_collator=data_collator,
-    #     compute_metrics=compute_metrics,
-    # )
-    
+
 
 if __name__ == "__main__":
     main()

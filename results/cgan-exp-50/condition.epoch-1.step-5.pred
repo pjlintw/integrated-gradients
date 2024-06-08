@@ -1,0 +1,20 @@
+1.0	0.86	[how] [CLS] after 1994 how may individuals with the first name giorgi bear the flag for georgia in the olympic
+1.0	0.05	[who] [CLS] who was the first minister of transpor ? [SEP]
+1.0	0.87	[how] [CLS] how much higher is the takapu road station than the wellington statio ? [SEP]
+0.0	0.09	[why] [CLS] how many centre position players are ther ? [SEP]
+0.0	0.04	[where] [CLS] after 1994 how may individuals with the first name giorgi bear the flag for georgia in the olympic
+1.0	0.69	[how] [CLS] how many total competitions were in south kore ? [SEP]
+1.0	0.74	[what] [CLS] what state came in last in the evening gown competitio ? [SEP]
+0.0	0.06	[where] [CLS] what state came in last in the evening gown competitio ? [SEP]
+0.0	0.05	[why] [CLS] what was the score after the season opene ? [SEP]
+0.0	0.14	[where] [CLS] which country has the least gdp growth where gdp nominal is more than 5 and gdp per capita
+0.0	0.05	[whose] [CLS] which countries each won 3 gold medal ? [SEP]
+1.0	0.75	[which] [CLS] which country has the least gdp growth where gdp nominal is more than 5 and gdp per capita
+0.0	0.02	[whose] [CLS] how many peaks are listed in ital ? [SEP]
+0.0	0.16	[why] [CLS] which is the most popular single on the albu ? [SEP]
+1.0	0.71	[which] [CLS] which year had the lowest positio ? [SEP]
+1.0	0.84	[how] [CLS] how many centre position players are ther ? [SEP]
+1.0	0.69	[which] [CLS] which artist has the most concert ? [SEP]
+1.0	0.88	[how] [CLS] how many rounds had more than 20,000 spectators in attendanc ? [SEP]
+1.0	0.87	[how] [CLS] how many teams played in the 2011 caf u-23 championship qualificatio ? [SEP]
+0.0	0.06	[where] [CLS] how many episodes are in series 7 (1983 ? [SEP]
