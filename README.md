@@ -167,8 +167,9 @@ To train the architecture, you have to pass the arguments for dataset loading an
  --max_val_samples 200 \
  --max_test_samples 200 \
  --logging_first_step True \
- --logging_steps 50 \
- --eval_steps 10
+ --logging_steps 5 \
+ --eval_steps 10 \
+ --max_steps 30
 ```
 
 ### Integrated-Gradients on Text GANs
